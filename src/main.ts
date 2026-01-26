@@ -1,21 +1,25 @@
-import { createApp } from 'vue'
+import { createApp, type App as VueApp } from 'vue'
 import './style.css'
 import App from './App.vue'
 import {auth} from './firebase/config'
 import router from './router'
+import {onAuthStateChanged} from 'firebase/auth'
 
-createApp(App)
-      .use(router)
-      .mount('#app')
+let app: VueApp | null = null
 
-console.log("Firebase Auth Status:", auth)
-
-
-//Kleiner test
-auth.onAuthStateChanged(user => {
-  if (user) {
-    console.log("User ist eingeloggt:", user.email);
-  } else {
-    console.log("Kein User eingeloggt – Firebase ist aber bereit!");
-  }
-});
+// warten auf das erste Signal von Firebase
+onAuthStateChanged(auth, (user) => {
+    // Nur wenn die App noch nicht gestartet wurde, initialisieren
+    if (!app) {
+        app = createApp(App)
+        app.use(router)
+        app.mount('#app')
+    }
+  
+    // Test-Log 
+    if (user) {
+      console.log("User ist eingeloggt:", user.email)
+    } else {
+      console.log("Kein User eingeloggt – Firebase ist aber bereit!")
+    }
+  })
