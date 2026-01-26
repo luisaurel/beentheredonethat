@@ -7,8 +7,12 @@ import Profil from '../views/Profil.vue'
 import Camera from '../views/Camera.vue'
 
 const routes = [
-  { path: '/', redirect: '/login' },
-  { path: '/login', component: Login },
+  { path: '/', 
+    name: 'Start',
+    redirect: '/login' },
+  { path: '/login',
+    name: 'Login',
+    component: Login },
   { path: '/chronik', component: Chronik },
   { path: '/map', component: Map },
   { path: '/profil', component: Profil },
