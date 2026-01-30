@@ -11,7 +11,12 @@ export default defineConfig({
         name: 'BeenThereDoneThat',
         short_name: 'BTDT',
         description: 'Sammle Wahrzeichen durch Besuche!',
-        theme_color: '#ffffff',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'pwa-192x192.png',

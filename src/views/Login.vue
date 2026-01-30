@@ -70,13 +70,14 @@
 
 <style scoped>
 .login-page {
-  min-height: 100vh;
+  height: 100vh;
   padding: 24px 16px;
   max-width: 420px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow: hidden;
 }
 
 .login-title {

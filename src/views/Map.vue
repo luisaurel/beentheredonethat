@@ -38,7 +38,7 @@ const landmarksWithDistance = computed(() => {
 const closestLandmark = computed(() => landmarksWithDistance.value[0])
 
 const canCollect = computed(() => {
-  return !!closestLandmark.value && closestLandmark.value.distance <= 50
+  return !!closestLandmark.value && closestLandmark.value.distance <= 100
 })
 
 const collectStamp = () => {
@@ -166,6 +166,7 @@ onMounted(async () => {
   position: relative;
   height: calc(100vh - 56px); /* Platz für BottomNav */
   width: 100%;
+  overflow: hidden;
 }
 
 #map {

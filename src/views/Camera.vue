@@ -15,6 +15,9 @@
           Kamera wird geladen…
         </div>
         <img v-if="capturedBlob" :src="previewUrl" alt="Vorschau" class="camera-preview" />
+        <button v-if="stream && !capturedBlob" class="btn-flip" @click="switchCamera" title="Kamera wechseln">
+          🔄
+        </button>
       </div>
 
       <div class="camera-actions">
@@ -54,18 +57,63 @@ const capturedBlob = ref<Blob | null>(null)
 const previewUrl = ref<string>('')
 const cameraError = ref<string | null>(null)
 const isSaving = ref(false)
+const facingMode = ref<'environment' | 'user'>('environment')
 
 onMounted(async () => {
   if (!landmarkName.value) return
+  
+  // Prüfe ob mediaDevices verfügbar ist (wichtig für PWA)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    cameraError.value = 'Kamera wird auf diesem Gerät nicht unterstützt'
+    return
+  }
+  
   try {
-    const media = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    })
+    // Erst Berechtigung prüfen wenn möglich
+    if (navigator.permissions) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'camera' as PermissionName })
+        if (permission.state === 'denied') {
+          cameraError.value = 'Kamera-Berechtigung wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen.'
+          return
+        }
+      } catch {
+        // permissions.query wird nicht überall unterstützt, einfach weitermachen
+      }
+    }
+    
+    // Versuche mit bevorzugter Rückkamera
+    let media: MediaStream | null = null
+    try {
+      media = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      })
+    } catch {
+      // Fallback: Versuche ohne facingMode-Präferenz
+      media = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      })
+    }
+    
     stream.value = media
-    if (videoRef.value) videoRef.value.srcObject = media
+    if (videoRef.value) {
+      videoRef.value.srcObject = media
+      // Warte bis Video bereit ist
+      await videoRef.value.play().catch(() => {})
+    }
   } catch (e: any) {
-    cameraError.value = e?.message ?? 'Kamera-Zugriff fehlgeschlagen'
+    console.error('Kamera-Fehler:', e)
+    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      cameraError.value = 'Kamera-Berechtigung wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen.'
+    } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+      cameraError.value = 'Keine Kamera gefunden.'
+    } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+      cameraError.value = 'Kamera wird bereits von einer anderen App verwendet.'
+    } else {
+      cameraError.value = e?.message ?? 'Kamera-Zugriff fehlgeschlagen'
+    }
   }
 })
 
@@ -118,12 +166,35 @@ function retake() {
   previewUrl.value = ''
   capturedBlob.value = null
   cameraError.value = null
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then((media) => {
+  startCamera()
+}
+
+async function startCamera() {
+  try {
+    const media = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode.value, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    })
     stream.value = media
-    if (videoRef.value) videoRef.value.srcObject = media
-  }).catch((e: any) => {
-    cameraError.value = e?.message ?? 'Kamera erneut starten fehlgeschlagen'
-  })
+    if (videoRef.value) {
+      videoRef.value.srcObject = media
+      await videoRef.value.play().catch(() => {})
+    }
+  } catch (e: any) {
+    cameraError.value = e?.message ?? 'Kamera starten fehlgeschlagen'
+  }
+}
+
+async function switchCamera() {
+  // Aktuelle Kamera stoppen
+  if (stream.value) {
+    stream.value.getTracks().forEach(t => t.stop())
+    stream.value = null
+  }
+  // FacingMode umschalten
+  facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment'
+  // Neue Kamera starten
+  await startCamera()
 }
 
 async function saveAndClose() {
@@ -152,9 +223,10 @@ function close() {
   padding: 24px 16px 80px;
   max-width: 420px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100vh;
   background: #0f172a;
   color: #f8fafc;
+  overflow: hidden;
 }
 
 .camera-message {
@@ -257,5 +329,29 @@ function close() {
   color: #f87171;
   font-size: 13px;
   margin: 0;
+}
+
+.btn-flip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.btn-flip:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: rotate(180deg);
 }
 </style>

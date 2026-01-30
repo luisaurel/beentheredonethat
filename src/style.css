@@ -27,3 +27,17 @@ a {
 button {
   font-family: inherit;
 }
+
+/* Portrait-only: Landscape-Modus nur auf Mobilgeräten verhindern */
+@media screen and (orientation: landscape) and (max-width: 900px) and (pointer: coarse) {
+  html {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100vh;
+    height: 100vw;
+    overflow-x: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+  }
+}
