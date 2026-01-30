@@ -50,8 +50,19 @@ const router = createRouter({
 })
 
 // Globaler Route Guard: prüft bei jedem Seitenwechsel, ob der User Zugriff hat
-router.beforeEach((to, _from, next) => {
-  const { user } = useAuth()
+router.beforeEach(async (to, _from, next) => {
+  const { user, isReady } = useAuth()
+
+  // Warten, bis Firebase Auth initialisiert ist (max. 2 Sekunden)
+  if (!isReady.value) {
+    let attempts = 0
+    const maxAttempts = 20 // 20 * 100ms = 2 Sekunden max
+    
+    while (!isReady.value && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      attempts++
+    }
+  }
 
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
