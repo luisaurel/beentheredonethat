@@ -4,7 +4,7 @@ import { db } from '../firebase/config'
 import { useAuth } from './useAuth'
 
 const stamps = ref<string[]>([])
-const stampPhotos = ref<Record<string, string>>({}) // landmarkName -> photoUrl
+const stampPhotos = ref<Record<string, string[]>>({}) // landmarkName -> array of photoUrls
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -20,9 +20,20 @@ export function useStamps() {
       const userRef = doc(db, 'users', user.value.uid)
       const snap = await getDoc(userRef)
       if (snap.exists()) {
-        const data = snap.data() as { stamps?: string[]; stampPhotos?: Record<string, string> }
+        const data = snap.data() as { stamps?: string[]; stampPhotos?: Record<string, string | string[]> }
         stamps.value = data.stamps ?? []
-        stampPhotos.value = data.stampPhotos ?? {}
+        
+        // Backward compatibility: convert single strings to arrays
+        const rawPhotos = data.stampPhotos ?? {}
+        const normalizedPhotos: Record<string, string[]> = {}
+        for (const [key, value] of Object.entries(rawPhotos)) {
+          if (typeof value === 'string') {
+            normalizedPhotos[key] = [value]
+          } else if (Array.isArray(value)) {
+            normalizedPhotos[key] = value
+          }
+        }
+        stampPhotos.value = normalizedPhotos
       } else {
         stamps.value = []
         stampPhotos.value = {}
@@ -42,7 +53,11 @@ export function useStamps() {
     error.value = null
     const userRef = doc(db, 'users', user.value.uid)
 
-    const newPhotos = photoUrl ? { ...stampPhotos.value, [stampName]: photoUrl } : undefined
+    // Append new photo to existing array
+    const existingPhotos = stampPhotos.value[stampName] ?? []
+    const newPhotosArray = photoUrl ? [...existingPhotos, photoUrl] : existingPhotos
+    const newPhotos = photoUrl ? { ...stampPhotos.value, [stampName]: newPhotosArray } : undefined
+    
     const updates: Record<string, unknown> = {
       stamps: arrayUnion(stampName)
     }
@@ -54,7 +69,7 @@ export function useStamps() {
       stamps.value.push(stampName)
     }
     if (photoUrl) {
-      stampPhotos.value = { ...stampPhotos.value, [stampName]: photoUrl }
+      stampPhotos.value = { ...stampPhotos.value, [stampName]: newPhotosArray }
     }
   }
 
