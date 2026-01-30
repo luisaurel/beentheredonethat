@@ -38,8 +38,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { storage } from '../firebase/config'
 import { useAuth } from '../composables/useAuth'
 import { useStamps } from '../composables/useStamps'
 
@@ -79,15 +77,28 @@ onUnmounted(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
 })
 
+// Blob zu Base64 Data-URL konvertieren
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 function capture() {
   if (!videoRef.value || !stream.value) return
   const video = videoRef.value
   const canvas = document.createElement('canvas')
-  canvas.width = video.videoWidth
-  canvas.height = video.videoHeight
+  // Kleinere Auflösung für Firestore-Limit (max 1MB)
+  const maxWidth = 800
+  const scale = Math.min(1, maxWidth / video.videoWidth)
+  canvas.width = video.videoWidth * scale
+  canvas.height = video.videoHeight * scale
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  ctx.drawImage(video, 0, 0)
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
   canvas.toBlob(
     (blob) => {
       if (!blob) return
@@ -98,7 +109,7 @@ function capture() {
       stream.value = null
     },
     'image/jpeg',
-    0.9
+    0.7  // Niedrigere Qualität für kleinere Dateigröße
   )
 }
 
@@ -119,11 +130,9 @@ async function saveAndClose() {
   if (!capturedBlob.value || !landmarkName.value || !user.value) return
   isSaving.value = true
   try {
-    const path = `users/${user.value.uid}/stamps/${encodeURIComponent(landmarkName.value)}_${Date.now()}.jpg`
-    const ref = storageRef(storage, path)
-    await uploadBytes(ref, capturedBlob.value, { contentType: 'image/jpeg' })
-    const photoUrl = await getDownloadURL(ref)
-    await addStamp(landmarkName.value, photoUrl)
+    // Bild als Base64 konvertieren und direkt in Firestore speichern
+    const base64Image = await blobToBase64(capturedBlob.value)
+    await addStamp(landmarkName.value, base64Image)
     router.replace('/map')
   } catch (e) {
     console.error(e)
