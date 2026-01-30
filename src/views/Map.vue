@@ -1,25 +1,5 @@
-<template>
-  <div class="map-container h-screen w-full relative">
-    <div id="map" class="h-full w-full"></div>
-
-    <div class="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1000] w-11/12 max-w-sm">
-      <div v-if="closestLandmark" class="bg-white p-4 rounded-2xl shadow-xl border border-gray-200">
-        <h2 class="font-bold">{{ closestLandmark.name }}</h2>
-        <p class="text-xs text-gray-500">{{ closestLandmark.distance.toFixed(0) }}m entfernt</p>
-        <button 
-          :disabled="closestLandmark.distance > 50"
-          class="w-full mt-2 py-2 rounded-lg font-bold transition-all"
-          :class="closestLandmark.distance <= 50 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'"
-        >
-          {{ closestLandmark.distance <= 50 ? 'Stempel sammeln' : 'Zu weit weg' }}
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, computed } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css' // WICHTIG: CSS importieren!
 import { useLocation } from '../composables/useLocation'
@@ -28,12 +8,23 @@ import { landmarks } from '../data/landmarks'
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
 let map: L.Map | null = null
 
-// Distanz-Logik
 const landmarksWithDistance = computed(() => {
-  return landmarks.map(l => ({
-    ...l,
-    distance: calculateDistance(coords.value.lat, coords.value.lng, l.lat, l.lng)
-  })).sort((a, b) => a.distance - b.distance)
+  if (!coords.value.lat || !coords.value.lng) return []
+
+  return landmarks
+    .map(landmark => {
+      const { lat, lng } = landmark.location
+      return {
+        ...landmark,
+        distance: calculateDistance(
+          coords.value.lat,
+          coords.value.lng,
+          lat,
+          lng
+        )
+      }
+    })
+    .sort((a, b) => a.distance - b.distance)
 })
 
 const closestLandmark = computed(() => landmarksWithDistance.value[0])
@@ -60,9 +51,10 @@ const initMap = () => {
 
   // Bens Wahrzeichen als Pins hinzufügen
   landmarks.forEach(landmark => {
-    L.marker([landmark.lat, landmark.lng])
+    const { lat, lng } = landmark.location
+    L.marker([lat, lng])
       .addTo(map!)
-      .bindPopup(`<b>${landmark.name}</b><br>${landmark.description}`)
+      .bindPopup(`<b>${landmark.name}</b><br>${landmark.city}, ${landmark.country}`)
   })
 }
 
@@ -79,7 +71,94 @@ onMounted(async () => {
 })
 </script>
 
-<style>
-/* Sicherstellen, dass die Karte den ganzen Platz einnimmt */
-#map { z-index: 1; }
+<template>
+  <div class="map-container">
+    <div id="map"></div>
+
+    <div class="overlay-card">
+      <div v-if="closestLandmark" class="card">
+        <h2 class="card-title">{{ closestLandmark.name }}</h2>
+        <p class="card-subtitle">
+          {{ closestLandmark.city }}, {{ closestLandmark.country }} ·
+          {{ closestLandmark.distance.toFixed(0) }} m entfernt
+        </p>
+        <button 
+          :disabled="closestLandmark.distance > 50"
+          class="card-button"
+          :class="closestLandmark.distance <= 50 ? 'card-button--active' : 'card-button--disabled'"
+        >
+          {{ closestLandmark.distance <= 50 ? 'Stempel sammeln' : 'Zu weit weg' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.map-container {
+  position: relative;
+  height: calc(100vh - 56px); /* Platz für BottomNav */
+  width: 100%;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+.overlay-card {
+  position: absolute;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 420px;
+  z-index: 1000;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e5e5e5;
+}
+
+.card-title {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0 0 8px;
+}
+
+.card-button {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.card-button--active {
+  background-color: #22c55e;
+  color: white;
+}
+
+.card-button--active:hover {
+  background-color: #16a34a;
+  transform: translateY(-1px);
+}
+
+.card-button--disabled {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
 </style>
