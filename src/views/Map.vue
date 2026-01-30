@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css' // WICHTIG: CSS importieren!
+import { useRouter } from 'vue-router'
 import { useLocation } from '../composables/useLocation'
 import { landmarks } from '../data/landmarks'
 
+const router = useRouter()
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
+const saveMessage = ref<string | null>(null)
 let map: L.Map | null = null
 
 const landmarksWithDistance = computed(() => {
@@ -28,6 +31,19 @@ const landmarksWithDistance = computed(() => {
 })
 
 const closestLandmark = computed(() => landmarksWithDistance.value[0])
+
+const canCollect = computed(() => {
+  return !!closestLandmark.value && closestLandmark.value.distance <= 50
+})
+
+const collectStamp = () => {
+  if (!canCollect.value || !closestLandmark.value) return
+  saveMessage.value = null
+  router.push({
+    name: 'Camera',
+    query: { landmark: closestLandmark.value.name }
+  })
+}
 
 const initMap = () => {
   if (!coords.value.lat) return
@@ -83,12 +99,14 @@ onMounted(async () => {
           {{ closestLandmark.distance.toFixed(0) }} m entfernt
         </p>
         <button 
-          :disabled="closestLandmark.distance > 50"
+          :disabled="!canCollect"
           class="card-button"
-          :class="closestLandmark.distance <= 50 ? 'card-button--active' : 'card-button--disabled'"
+          :class="canCollect ? 'card-button--active' : 'card-button--disabled'"
+          @click="collectStamp"
         >
-          {{ closestLandmark.distance <= 50 ? 'Stempel sammeln' : 'Zu weit weg' }}
+          {{ canCollect ? 'Stempel sammeln (Foto aufnehmen)' : 'Zu weit weg' }}
         </button>
+        <p v-if="saveMessage" class="card-info">{{ saveMessage }}</p>
       </div>
     </div>
   </div>
