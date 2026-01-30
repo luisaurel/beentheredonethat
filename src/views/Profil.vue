@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { useStamps } from '../composables/useStamps'
-import { landmarks } from '../data/landmarks'
+import { useLandmarks } from '../composables/useLandmarks'
 
 const { stamps, stampPhotos, loadStamps } = useStamps()
+const { landmarks, loadLandmarks } = useLandmarks()
 
 const collectedLandmarks = computed(() => {
-  if (!stamps.value.length) return []
-  return landmarks.filter(l => stamps.value.includes(l.name))
+  if (!stamps.value.length || !landmarks.value.length) return []
+  return landmarks.value.filter(l => stamps.value.includes(l.name))
 })
 
 const getStampPhoto = (landmarkName: string) => stampPhotos.value[landmarkName] ?? null
 
-onMounted(() => {
-  loadStamps()
+onMounted(async () => {
+  await Promise.all([loadStamps(), loadLandmarks()])
 })
 </script>
 
