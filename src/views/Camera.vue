@@ -227,6 +227,13 @@ function close() {
   background: #0f172a;
   color: #f8fafc;
   overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 .camera-message {
