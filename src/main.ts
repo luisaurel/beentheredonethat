@@ -4,6 +4,17 @@ import App from './App.vue'
 import {auth} from './firebase/config'
 import router from './router'
 import {onAuthStateChanged} from 'firebase/auth'
+import L from 'leaflet'
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png'
+import markerIconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png'
+
+// Ecke für Vite/Bundling: Leaflet erwartet relative Bildpfade; wir setzen explizit die importierten Assets
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIconUrl,
+  iconRetinaUrl: markerIconRetinaUrl,
+  shadowUrl: markerShadowUrl
+})
 
 let app: VueApp | null = null
 
