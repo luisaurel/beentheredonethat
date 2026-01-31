@@ -1,5 +1,5 @@
 import { createApp, type App as VueApp } from 'vue'
-import './style.css'
+import './main.css'
 import App from './App.vue'
 import {auth} from './firebase/config'
 import router from './router'

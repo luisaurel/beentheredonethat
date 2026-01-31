@@ -1,19 +1,9 @@
 <template>
-  <div>
-    <h1>Chronik-Ansicht</h1>
-
-    <button @click="goToCamera">
-      Kamera
-    </button>
-  </div>
+  <AppShell title="Meine Briefmarken">
+    <p>Hier kommt deine Liste…</p>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-function goToCamera() {
-  router.push('/camera')
-}
+import AppShell from '../AppShell.vue'
 </script>
