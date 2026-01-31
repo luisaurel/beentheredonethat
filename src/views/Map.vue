@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue'
+import AppShell from '../AppShell.vue'
+import { onMounted, computed, ref, watch, nextTick } from 'vue'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css' // WICHTIG: CSS importieren!
+import 'leaflet/dist/leaflet.css'
 import { useRouter } from 'vue-router'
 import { useLocation } from '../composables/useLocation'
 import { useLandmarks } from '../composables/useLandmarks'
@@ -11,6 +12,7 @@ const router = useRouter()
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
 const { landmarks, loadLandmarks } = useLandmarks()
 const { stamps, loadStamps } = useStamps()
+
 const saveMessage = ref<string | null>(null)
 let map: L.Map | null = null
 let landmarkMarkers: L.Layer[] = []
@@ -24,12 +26,7 @@ const landmarksWithDistance = computed(() => {
       const { lat, lng } = landmark.location
       return {
         ...landmark,
-        distance: calculateDistance(
-          coords.value.lat,
-          coords.value.lng,
-          lat,
-          lng
-        )
+        distance: calculateDistance(coords.value.lat, coords.value.lng, lat, lng)
       }
     })
     .sort((a, b) => a.distance - b.distance)
@@ -44,30 +41,22 @@ const canCollect = computed(() => {
 const collectStamp = () => {
   if (!canCollect.value || !closestLandmark.value) return
   saveMessage.value = null
-  router.push({
-    name: 'Camera',
-    query: { landmark: closestLandmark.value.name }
-  })
+  router.push({ name: 'Camera', query: { landmark: closestLandmark.value.name } })
 }
 
 const addLandmarkMarkers = () => {
   if (!map) return
-  // vorhandene Landmark-Marker entfernen
+
   landmarkMarkers.forEach(m => map?.removeLayer(m))
   landmarkMarkers = []
 
   landmarks.value.forEach(landmark => {
-    // Defensive check: sicherstellen dass location existiert
-    if (!landmark.location || typeof landmark.location.lat !== 'number') {
-      console.warn('Landmark ohne gültige Location:', landmark.name)
-      return
-    }
-    
+    if (!landmark.location || typeof landmark.location.lat !== 'number') return
+
     const { lat, lng } = landmark.location
     const collected = stamps.value.includes(landmark.name)
-    const color = collected ? '#22c55e' : '#f97316' // grün = erfasst, orange = noch nicht
+    const color = collected ? '#22c55e' : '#f97316'
 
-    // Pin-Icon als SVG
     const pinIcon = L.divIcon({
       className: 'custom-pin',
       html: `
@@ -90,95 +79,104 @@ const addLandmarkMarkers = () => {
   })
 }
 
-const initMap = () => {
-  if (!coords.value.lat) return
-  // Verhindere doppelte Initialisierung
-  if (map) return
+const initMap = async () => {
+  if (!coords.value.lat || map) return
 
-  // Karte auf User-Standort zentrieren
+  await nextTick()
+
   map = L.map('map').setView([coords.value.lat, coords.value.lng], 15)
 
-  // OpenStreetMap Kacheln hinzufügen
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map)
 
-  // Blauen Punkt für den User setzen
   L.circleMarker([coords.value.lat, coords.value.lng], {
     radius: 8,
-    fillColor: "#3b82f6",
-    color: "#fff",
+    fillColor: '#3b82f6',
+    color: '#fff',
     weight: 2,
     fillOpacity: 1
-  }).addTo(map).bindPopup("Du bist hier")
+  }).addTo(map).bindPopup('Du bist hier')
 
-  // Landmark-Marker jetzt hinzufügen (abhängig von stamps)
   addLandmarkMarkers()
+
+  setTimeout(() => map?.invalidateSize(), 200)
 }
 
-// Bei Änderungen an stamps oder landmarks Marker neu rendern
-watch([stamps, landmarks], () => {
-  addLandmarkMarkers()
-})
+watch([stamps, landmarks], () => addLandmarkMarkers())
 
 onMounted(async () => {
   try {
     await getBrowserLocation()
     await Promise.all([loadStamps(), loadLandmarks()])
-    initMap()
+    await initMap()
   } catch (err) {
-    console.error("Konnte Standort nicht laden", err)
-    // Fallback: Berlin Zentrum, falls GPS verweigert wird
-    coords.value = { lat: 52.5200, lng: 13.4050 }
+    console.error('Konnte Standort nicht laden', err)
+    coords.value = { lat: 52.52, lng: 13.405 }
     await Promise.all([loadStamps(), loadLandmarks()])
-    initMap()
+    await initMap()
   }
 })
 </script>
 
 <template>
-  <div class="map-container">
-    <div id="map"></div>
+  <AppShell title="Karte" class="map-shell">
+    <div class="map-container">
+      <div id="map"></div>
 
-    <div class="overlay-card">
-      <div v-if="closestLandmark" class="card">
-        <h2 class="card-title">{{ closestLandmark.name }}</h2>
-        <p class="card-subtitle">
-          {{ closestLandmark.city }}, {{ closestLandmark.country }} ·
-          {{ closestLandmark.distance.toFixed(0) }} m entfernt
-        </p>
-        <button 
-          :disabled="!canCollect"
-          class="card-button"
-          :class="canCollect ? 'card-button--active' : 'card-button--disabled'"
-          @click="collectStamp"
-        >
-          {{ canCollect ? 'Stempel sammeln (Foto aufnehmen)' : 'Zu weit weg' }}
-        </button>
-        <p v-if="saveMessage" class="card-info">{{ saveMessage }}</p>
+      <div class="overlay-card">
+        <div v-if="closestLandmark" class="card">
+          <h2 class="card-title">{{ closestLandmark.name }}</h2>
+          <p class="card-subtitle">
+            {{ closestLandmark.city }}, {{ closestLandmark.country }} ·
+            {{ closestLandmark.distance.toFixed(0) }} m entfernt
+          </p>
+
+          <button
+            :disabled="!canCollect"
+            class="card-button"
+            :class="canCollect ? 'card-button--active' : 'card-button--disabled'"
+            @click="collectStamp"
+          >
+            {{ canCollect ? 'Stempel sammeln (Foto aufnehmen)' : 'Zu weit weg' }}
+          </button>
+
+          <p v-if="saveMessage" class="card-info">{{ saveMessage }}</p>
+        </div>
       </div>
     </div>
-  </div>
+  </AppShell>
 </template>
 
 <style scoped>
+/* Map soll wirklich edge-to-edge sein */
+:deep(.map-shell .topbar),
+:deep(.map-shell .bottom-nav) {
+  border: none !important;
+}
+
+:deep(.map-shell .content) {
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+
 .map-container {
-  position: relative;
-  height: calc(100vh - 56px); /* Platz für BottomNav */
+  height: 100%;
   width: 100%;
+  position: relative;
   overflow: hidden;
 }
 
 #map {
   height: 100%;
   width: 100%;
-  z-index: 1;
 }
 
 .overlay-card {
   position: absolute;
   left: 50%;
-  bottom: 80px;
+  bottom: calc(var(--nav-height) + 12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: 90%;
   max-width: 420px;
@@ -211,17 +209,11 @@ onMounted(async () => {
   border: none;
   font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
 .card-button--active {
   background-color: #22c55e;
   color: white;
-}
-
-.card-button--active:hover {
-  background-color: #16a34a;
-  transform: translateY(-1px);
 }
 
 .card-button--disabled {
@@ -231,11 +223,9 @@ onMounted(async () => {
 }
 </style>
 
-<!-- Global styles for custom pin icons -->
 <style>
 .custom-pin {
   background: none !important;
   border: none !important;
 }
 </style>
-

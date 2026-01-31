@@ -1,8 +1,18 @@
 <template>
   <div class="shell">
     <header class="topbar">
-      <h1 class="title">{{ title }}</h1>
-    </header>
+
+  <div class="topbar-left">
+    <slot name="topbar-left" />
+  </div>
+
+  <h1 class="title">{{ title }}</h1>
+
+  <div class="topbar-right">
+    <slot name="topbar-right" />
+  </div>
+</header>
+
 
     <main class="content">
       <slot />
@@ -57,13 +67,16 @@ defineProps<{ title: string }>()
 
 <style scoped>
 .shell {
-  min-height: 100vh;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  position: relative; /* ✅ nötig für topbar-right absolute */
+  flex: 0 0 auto;
   height: calc(52px + env(safe-area-inset-top));
   padding-top: env(safe-area-inset-top);
   display: flex;
@@ -72,31 +85,54 @@ defineProps<{ title: string }>()
   border-bottom: 1px solid #eaeaea;
   background: #fff;
   padding: 0 12px;
+  z-index: 10;
 }
 
 .title {
   margin: 0;
 }
 
+.topbar-right {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-left {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
 .content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
-  padding-bottom: calc(
-    var(--nav-height) + 16px + env(safe-area-inset-bottom)
-  );
+  padding-bottom: calc(var(--nav-height) + 16px + env(safe-area-inset-bottom));
 }
 
 .bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  flex: 0 0 auto;
+  height: var(--nav-height);
   padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-around;
   border-top: 1px solid #eaeaea;
   background: #fff;
+  z-index: 10;
 }
 
 .icon {

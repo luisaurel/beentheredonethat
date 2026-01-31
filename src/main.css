@@ -5,6 +5,7 @@
 
 html, body, #app {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -36,3 +37,18 @@ p {
 button, a {
   touch-action: manipulation;
 }
+
+@media screen and (orientation: landscape) and (max-width: 900px) and (pointer: coarse) {
+  html {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100vh;
+    height: 100vw;
+    overflow-x: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+  }
+}
+
+

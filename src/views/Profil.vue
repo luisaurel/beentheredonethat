@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import AppShell from '../AppShell.vue'
+import { useRouter } from 'vue-router'
 
 import pisa1 from '../assets/pisa1.jpg'
 import editIcon from '../assets/edit.png'
+import logoutIcon from '../assets/logout.png'
 
 import { useStamps } from '../composables/useStamps'
 import { useLandmarks } from '../composables/useLandmarks'
+import { useAuth } from '../composables/useAuth'
 
 type Profile = {
   name: string
@@ -15,6 +18,17 @@ type Profile = {
 }
 
 const STORAGE_KEY = 'profile_v1'
+
+const router = useRouter()
+const { logout } = useAuth()
+
+const doLogout = async () => {
+  try {
+    await logout()
+  } finally {
+    router.push({ name: 'Login', query: { forceLogin: '1' } })
+  }
+}
 
 // --- Profil (Edit + LocalStorage) ---
 const profile = ref<Profile>({
@@ -45,8 +59,14 @@ const saveEdit = () => {
     bio: formBio.value,
     avatarDataUrl: formAvatarDataUrl.value || profile.value.avatarDataUrl
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile.value))
-  isEditing.value = false
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile.value))
+  } catch (e) {
+    console.error('Konnte Profil nicht speichern (localStorage evtl. voll?)', e)
+  } finally {
+    isEditing.value = false
+  }
 }
 
 const onPickAvatar = (e: Event) => {
@@ -63,11 +83,10 @@ const onPickAvatar = (e: Event) => {
   input.value = ''
 }
 
-// --- Daten aus Firebase/Composables (neue Funktionalität) ---
+// --- Daten aus Firebase/Composables ---
 const { stamps, stampPhotos, loadStamps } = useStamps()
 const { landmarks, loadLandmarks } = useLandmarks()
 
-// Modal fürs Bild-Gallery (pro Landmark mehrere Fotos)
 const selectedLandmark = ref<{ name: string; city: string; country: string } | null>(null)
 const currentImageIndex = ref(0)
 
@@ -79,7 +98,6 @@ const collectedLandmarks = computed(() => {
 const getStampPhotos = (landmarkName: string): string[] => stampPhotos.value[landmarkName] ?? []
 const getFirstPhoto = (landmarkName: string): string | null => getStampPhotos(landmarkName)[0] ?? null
 
-// Für das Grid: wir zeigen pro gesammeltem Landmark das erste Foto (oder fallback)
 const galleryTiles = computed(() => {
   return collectedLandmarks.value.map(l => ({
     name: l.name,
@@ -114,7 +132,6 @@ const prevImage = () => {
 }
 
 onMounted(async () => {
-  // Profil aus LocalStorage laden
   const raw = localStorage.getItem(STORAGE_KEY)
   if (raw) {
     try {
@@ -125,11 +142,10 @@ onMounted(async () => {
     }
   }
 
-  // Stamps + Landmarks laden
   await Promise.all([loadStamps(), loadLandmarks()])
 })
 
-// Stats (design wie vorher, Werte aus echten Daten)
+// Stats
 const sightsCount = computed(() => collectedLandmarks.value.length)
 
 const countriesCount = computed(() => {
@@ -140,19 +156,27 @@ const countriesCount = computed(() => {
 </script>
 
 <template>
-  <AppShell title="Profil">
+  <AppShell title="Profil" class="profile-shell">
+    <template #topbar-left>
+      <button class="edit-topbar-btn" @click="openEdit" aria-label="Profil bearbeiten">
+        <img :src="editIcon" alt="" />
+      </button>
+    </template>
+
+    <template #topbar-right>
+      <button class="logout-btn" type="button" @click="doLogout" aria-label="Abmelden">
+        <img :src="logoutIcon" alt="" class="logout-icon" />
+      </button>
+    </template>
+
     <div class="profile">
-      <!-- Header: Avatar + Name + Bio -->
+      <!-- Header -->
       <section class="top">
         <img class="avatar" :src="profile.avatarDataUrl" alt="Profilbild" />
 
         <div class="meta">
           <div class="name-row">
             <div class="name">{{ profile.name }}</div>
-
-            <button class="edit-btn" type="button" @click="openEdit" aria-label="Profil bearbeiten">
-              <img :src="editIcon" alt="" class="edit-icon" />
-            </button>
           </div>
 
           <div class="bio">{{ profile.bio }}</div>
@@ -174,7 +198,7 @@ const countriesCount = computed(() => {
 
       <div class="divider"></div>
 
-      <!-- Galerie (Insta-Grid) -->
+      <!-- Galerie -->
       <section class="gallery" aria-label="Gesammelte Sehenswürdigkeiten">
         <button
           v-for="tile in galleryTiles"
@@ -187,8 +211,10 @@ const countriesCount = computed(() => {
           <span v-if="!tile.hasPhotos" class="tile-badge">📷</span>
         </button>
 
-        <div v-if="!galleryTiles.length" class="empty">
-          Noch keine Sehenswürdigkeiten gesammelt.
+        <!-- ✅ Empty State im gleichen Stil wie Chronik -->
+        <div v-if="!galleryTiles.length" class="empty-state">
+          Los geht’s ✨<br />
+          Fotografiere ein paar Sehenswürdigkeiten.
         </div>
       </section>
 
@@ -227,7 +253,7 @@ const countriesCount = computed(() => {
         </div>
       </div>
 
-      <!-- Gallery Modal (Fotos durchklicken) -->
+      <!-- Gallery Modal -->
       <div v-if="selectedLandmark" class="gallery-overlay" @click.self="closeGallery">
         <div class="gallery-modal">
           <button class="gallery-close" @click="closeGallery" type="button">✕</button>
@@ -279,6 +305,41 @@ const countriesCount = computed(() => {
 </template>
 
 <style scoped>
+.logout-btn {
+  border: none;
+  background: transparent;
+  padding: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.logout-btn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.logout-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.edit-topbar-btn {
+  border: none;
+  background: transparent;
+  padding: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.edit-topbar-btn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.edit-topbar-btn img {
+  width: 20px;
+  height: 20px;
+}
+
+/* Layout */
 .profile {
   display: flex;
   flex-direction: column;
@@ -288,7 +349,7 @@ const countriesCount = computed(() => {
 /* Top Bereich */
 .top {
   display: flex;
-  gap: 18px;
+  gap: 20px;
   align-items: center;
 }
 
@@ -311,29 +372,13 @@ const countriesCount = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px; /* Abstand Name ↔ Bio */
+  margin-bottom: 6px;
 }
 
 .name {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 18px;
   line-height: 1.2;
-}
-
-.edit-btn {
-  border: 1px solid #ededed;
-  background: #fff;
-  border-radius: 12px;
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.edit-icon {
-  width: 18px;
-  height: 18px;
 }
 
 .bio {
@@ -419,12 +464,14 @@ const countriesCount = computed(() => {
   border-radius: 999px;
 }
 
-.empty {
+/* ✅ Empty State im Chronik-Stil */
+.empty-state {
   grid-column: 1 / -1;
   text-align: center;
   color: #6b7280;
-  font-size: 14px;
-  padding: 16px 0;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 48px 16px;
 }
 
 /* Edit Modal */
@@ -436,6 +483,7 @@ const countriesCount = computed(() => {
   place-items: center;
   z-index: 2000;
   padding: 16px;
+  box-sizing: border-box;
 }
 
 .modal {
@@ -446,6 +494,12 @@ const countriesCount = computed(() => {
   border: 1px solid #ededed;
   padding: 14px;
   box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+
+  max-height: calc(100svh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+
+  box-sizing: border-box;
 }
 
 .modal-title {
@@ -459,6 +513,7 @@ const countriesCount = computed(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .modal-avatar {
@@ -495,6 +550,9 @@ const countriesCount = computed(() => {
 
 .input, .textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
   border: 1px solid #e5e5e5;
   border-radius: 12px;
   padding: 10px 12px;
@@ -507,6 +565,7 @@ const countriesCount = computed(() => {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .btn {
