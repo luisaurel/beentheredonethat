@@ -9,7 +9,6 @@ const {
   loading,
   error,
   loadCountryData,
-  addDiscovery
 } = useCountryStamps();
 
 onMounted(() => {

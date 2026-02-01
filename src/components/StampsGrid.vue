@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { onMounted } from "vue";
 import { COUNTRIES, type CountryCode } from "../data/countries";
 import { useCountryStamps } from "../composables/useCountryStamps";
 import { STAMP_LIMITS, getTierStarted, splitCounts } from "../data/stampThresholds";
@@ -49,12 +49,6 @@ const tierLabel = (tier: Tier) => {
 const discoveriesText = (total: number) =>
   `${total} ${total === 1 ? "Sehenswürdigkeit" : "Sehenswürdigkeiten"} entdeckt`;
 
-/** Optional: Gesamtfortschritt (für Debug oder später) */
-const totalDiscoveries = computed(() => {
-  const p = countryProgress.value;
-  if (!p) return 0;
-  return Object.values(p).reduce((a, b) => a + b, 0);
-});
 </script>
 
 <template>

@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import { useLocation } from '../composables/useLocation'
 import { useLandmarks } from '../composables/useLandmarks'
 import { useStamps } from '../composables/useStamps'
-import cameraIcon from '../assets/camera.png'
 
 const router = useRouter()
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
@@ -46,10 +45,6 @@ const collectStamp = () => {
   router.push({ name: 'Camera', query: { landmark: closestLandmark.value.name } })
 }
 
-const openCamera = () => {
-  // Open camera without a specific landmark - for free photo at current location
-  router.push({ name: 'Camera' })
-}
 
 // Lädt Overpass-Landmarks für aktuellen Kartenausschnitt
 const loadOverpassLandmarks = async () => {
