@@ -88,31 +88,69 @@ const onPickAvatar = (e: Event) => {
 }
 
 // --- Daten aus Firebase/Composables ---
-const { stamps, stampPhotos, loadStamps } = useStamps()
+const { stamps, stampPhotos, loadStamps, collectedCountries, stampEntries, deleteStamp } = useStamps()
 const { landmarks, loadLandmarks } = useLandmarks()
 
-
+// (Slideshow removed) Collected landmarks list remains for gallery tiles
 const collectedLandmarks = computed(() => {
   if (!stamps.value.length || !landmarks.value.length) return []
   return landmarks.value.filter(l => stamps.value.includes(l.name))
 })
 
-const getStampPhotos = (landmarkName: string): string[] => stampPhotos.value[landmarkName] ?? []
-const getFirstPhoto = (landmarkName: string): string | null => getStampPhotos(landmarkName)[0] ?? null
+// galleryTiles removed (we keep only the my-photos grid)
 
-const galleryTiles = computed(() => {
-  return collectedLandmarks.value.map(l => ({
-    name: l.name,
-    city: l.city,
-    country: l.country,
-    thumb: getFirstPhoto(l.name) || profile.value.avatarDataUrl,
-    hasPhotos: getStampPhotos(l.name).length > 0
-  }))
+
+// --- Alle gemachten Fotos (für Grid-Anzeige) ---
+const userPhotos = computed(() => {
+  // use stampEntries (subcollection) because it contains every saved stamp with photoUrl
+  return stampEntries.value
+    .filter(s => !!s.photoUrl)
+    .slice() // copy
+    .sort((a, b) => {
+      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+      return tb - ta
+    })
+})
+
+// Flaggen-Emoji aus ISO2 (z.B. 'DE' -> 🇩🇪)
+function countryCodeToEmoji(code?: string | null) {
+  if (!code || code.length !== 2) return '🏳️'
+  return code.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+}
+
+// Slideshow functions removed — gallery modal no longer used
+
+// --- Collected Countries / Badges ---
+const collectedCountriesList = computed(() => {
+  return Object.entries(collectedCountries.value).map(([code, v]) => ({ code, name: v.name, firstCollectedAt: v.firstCollectedAt, stamps: v.stamps ?? [] }))
 })
 
 
+const selectedCountry = ref<string | null>(null)
+const openCountry = (code: string) => { selectedCountry.value = code }
+const closeCountry = () => { selectedCountry.value = null }
 
+// Modal control to open the countries list (from the stat)
+const countriesModalOpen = ref(false)
+const openCountriesModal = () => { countriesModalOpen.value = true; selectedCountry.value = null }
+const closeCountriesModal = () => { countriesModalOpen.value = false; selectedCountry.value = null }
 
+const countryStamps = computed(() => {
+  if (!selectedCountry.value) return []
+  return stampEntries.value.filter(s => s.countryCode === selectedCountry.value)
+})
+
+const onDelete = async (id: string, name?: string, photoUrl?: string, countryCode?: string) => {
+  const ok = confirm('Foto löschen? Diese Aktion kann nicht rückgängig gemacht werden.')
+  if (!ok) return
+  try {
+    await deleteStamp(id)
+  } catch (e) {
+    console.error(e)
+    alert('Löschen fehlgeschlagen')
+  }
+}
 
 onMounted(async () => {
   // warten bis Firebase Auth initialisiert ist
@@ -141,23 +179,11 @@ onMounted(async () => {
 })
 
 // Stats
-const sightsCount = computed(() => collectedLandmarks.value.length)
+// Anzahl Sehenswürdigkeiten = Anzahl gemachter Fotos
+const sightsCount = computed(() => userPhotos.value.length)
 
-const countriesCount = computed(() => {
-  if (!stamps.value.length || !landmarks.value.length) return 0
-
-  const countries = new Set<string>()
-
-  stamps.value.forEach(stampName => {
-    const landmark = landmarks.value.find(l => l.name === stampName)
-    if (landmark?.country) {
-      countries.add(landmark.country)
-    }
-  })
-
-  return countries.size
-})
-
+// Use collectedCountries from Firestore (more accurate than landmarks' country strings)
+const countriesCount = computed(() => Object.keys(collectedCountries.value).length)
 </script>
 
 <template>
@@ -200,7 +226,7 @@ const countriesCount = computed(() => {
           <div class="stat-label">Sehenswürdigkeiten</div>
         </div>
 
-        <div class="stat">
+        <div class="stat clickable-stat" @click="openCountriesModal" role="button" tabindex="0">
           <div class="stat-number">{{ countriesCount }}</div>
           <div class="stat-label">Länder</div>
         </div>
@@ -208,24 +234,51 @@ const countriesCount = computed(() => {
 
       <div class="divider"></div>
 
-      <!-- Galerie -->
-      <section class="gallery" aria-label="Gesammelte Sehenswürdigkeiten">
-        <div
-          v-for="(tile, idx) in galleryTiles"
-          :key="tile.name"
-          class="tile"
-        >
-          <img :src="tile.thumb" :alt="tile.name" />
-          <span v-if="!tile.hasPhotos" class="tile-badge">📷</span>
+      <!-- Countries Modal (opened from the "Länder" stat) -->
+      <div v-if="countriesModalOpen" class="country-modal-backdrop" @click.self="closeCountriesModal">
+        <div class="country-modal">
+          <button class="modal-close" @click="closeCountriesModal">✕</button>
 
+          <template v-if="!selectedCountry">
+            <h3>Gesammelte Länder ({{ countriesCount }})</h3>
+            <div v-if="collectedCountriesList.length">
+              <button v-for="c in collectedCountriesList" :key="c.code" class="country-row" @click="openCountry(c.code)">
+                <div class="code">{{ c.code }}</div>
+                <div class="name">{{ c.name }}</div>
+                <div class="count">{{ (c.stamps || []).length }} Stamps</div>
+              </button>
+            </div>
+            <div v-else class="empty-state">Keine Länder gesammelt.</div>
+          </template>
 
-        <div v-if="!galleryTiles.length" class="empty-state">
-          Los geht’s ✨<br />
-          Fotografiere ein paar Sehenswürdigkeiten.
+          <template v-else>
+            <button class="btn-ghost" @click="selectedCountry = null">← Zurück</button>
+            <h3>Stamps in {{ collectedCountriesList.find(x => x.code === selectedCountry)?.name }}</h3>
+
+            <div v-if="countryStamps.length">
+              <div v-for="s in countryStamps" :key="s.id" class="country-stamp">
+                <div class="meta">
+                  <div class="name">{{ s.name }}</div>
+                  <div class="when">{{ s.createdAt?.toDate ? s.createdAt.toDate().toLocaleString() : '' }}</div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">Keine Stamps in diesem Land.</div>
+          </template>
         </div>
+      </div>
+
+      <!-- Meine Fotos (3-Spalten-Grid mit Flagge) -->
+      <section class="my-photos" aria-label="Meine Fotos">
+        <div v-if="userPhotos.length" class="my-photos-grid">
+          <button v-for="p in userPhotos" :key="p.id" class="my-photo-grid-item" type="button" @click="openCountry(p.countryCode)">
+            <img :src="p.photoUrl || p.url" :alt="p.name" />
+            <div class="flag" :title="(collectedCountries[p.countryCode]?.name) || p.countryCode">{{ countryCodeToEmoji(p.countryCode) }}</div>
+            <button class="delete-btn" @click.stop="onDelete(p.id, p.name, p.photoUrl, p.countryCode)" aria-label="Foto löschen">✕</button>
+          </button>
         </div>
+        <div v-else class="empty-state">Noch keine Fotos — mach eins in der Kamera.</div>
       </section>
-</div>
 
 
 
@@ -263,6 +316,9 @@ const countriesCount = computed(() => {
           </div>
         </div>
       </div>
+
+      <!-- Slideshow removed -->
+    </div>
   </AppShell>
 </template>
 
@@ -394,47 +450,6 @@ const countriesCount = computed(() => {
   width: 100%;
 }
 
-/* Galerie */
-.gallery {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  position: relative;
-}
-
-.tile {
-  position: relative;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.tile::before {
-  content: "";
-  display: block;
-  padding-top: 100%;
-}
-
-.tile img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.tile-badge {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  background: rgba(0,0,0,0.65);
-  color: #fff;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 999px;
-}
 
 /* Empty State */
 .empty-state {
@@ -555,5 +570,65 @@ const countriesCount = computed(() => {
   border-color: #111;
   color: #fff;
 }
+
+
+/* My Photos grid (3 columns) */
+.my-photos { margin: 8px 0 12px }
+.my-photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px }
+.my-photo-grid-item { position: relative; width: 100%; padding: 0; border: none; background: transparent; border-radius: 10px; overflow: hidden }
+.my-photo-grid-item img { width: 100%; height: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block }
+.my-photo-grid-item .flag { position: absolute; left: 6px; top: 6px; background: rgba(255,255,255,0.9); border-radius: 6px; padding: 2px 6px; font-weight: 700; font-size: 14px }
+.my-photo-grid-item .delete-btn { position: absolute; right: 6px; top: 6px; background: rgba(0,0,0,0.6); color: #fff; border: none; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; cursor: pointer }
+.my-photo-grid-item .delete-btn:active { transform: scale(0.97) }
+
+
+
+
+/* Country Modal */
+.country-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 2100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.country-modal {
+  width: 100%;
+  max-width: 520px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.25);
+}
+.country-modal .modal-close {
+  float: right;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+}
+.country-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  width: 100%;
+}
+.country-row .code { font-weight: 800; margin-right: 12px }
+.country-row .name { color: #374151 }
+.country-row .count { color: #6b7280; font-size: 12px }
+.country-stamp {
+  display: block;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+.country-stamp .meta .name { font-weight: 700 }
+.country-stamp .meta .when { font-size: 12px; color: #6b7280 }
+.clickable-stat { cursor: pointer }
 
 </style>
