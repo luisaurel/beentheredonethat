@@ -22,7 +22,7 @@ type StampEntry = {
 const stamps = ref<string[]>([])
 const stampPhotos = ref<Record<string, string[]>>({}) // landmarkName -> array of photoUrls
 const stampEntries = ref<StampEntry[]>([])
-const collectedCountries = ref<Record<string, { name: string; firstCollectedAt: any }>>({})
+const collectedCountries = ref<Record<string, { name: string; firstCollectedAt: any; stamps?: string[] }>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -177,9 +177,9 @@ export function useStamps() {
             }
             // Update local reactive copy if present
             const local = collectedCountries.value[code] ?? { name: existing[code].name ?? code, firstCollectedAt: existing[code].firstCollectedAt ?? null, stamps: [] }
-            const localStamps = Array.isArray(local.stamps) ? local.stamps : (existing[code].stamps ?? [])
+            const localStamps = Array.isArray((local as any).stamps) ? (local as any).stamps : (existing[code].stamps ?? [])
             if (!localStamps.includes(stampId)) {
-              collectedCountries.value = { ...collectedCountries.value, [code]: { ...local, stamps: [...localStamps, stampId] } }
+              collectedCountries.value = { ...collectedCountries.value, [code]: { ...(local as any), stamps: [...localStamps, stampId] } }
             }
           }
         }
@@ -239,7 +239,7 @@ export function useStamps() {
           const filtered = arr.filter((u: string) => u !== photoUrl)
           const newPhotos = { ...rawPhotos, [name]: filtered }
           // if empty array remove the key
-          if (filtered.length === 0) delete newPhotos[name]
+          if (filtered.length === 0) delete (newPhotos as any)[name]
           await setDoc(userRef, { stampPhotos: newPhotos }, { merge: true })
         } catch (e) {
           console.error('Konnte stampPhotos nicht aktualisieren', e)

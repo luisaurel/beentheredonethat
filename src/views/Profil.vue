@@ -88,14 +88,8 @@ const onPickAvatar = (e: Event) => {
 }
 
 // --- Daten aus Firebase/Composables ---
-const { stamps, stampPhotos, loadStamps, collectedCountries, stampEntries, deleteStamp } = useStamps()
-const { landmarks, loadLandmarks } = useLandmarks()
-
-// (Slideshow removed) Collected landmarks list remains for gallery tiles
-const collectedLandmarks = computed(() => {
-  if (!stamps.value.length || !landmarks.value.length) return []
-  return landmarks.value.filter(l => stamps.value.includes(l.name))
-})
+const { loadStamps, collectedCountries, stampEntries, deleteStamp } = useStamps()
+const { loadLandmarks } = useLandmarks()
 
 // galleryTiles removed (we keep only the my-photos grid)
 
@@ -114,9 +108,14 @@ const userPhotos = computed(() => {
 })
 
 // Flaggen-Emoji aus ISO2 (z.B. 'DE' -> 🇩🇪)
-function countryCodeToEmoji(code?: string | null) {
+function countryCodeToEmoji(code?: string | null | undefined) {
   if (!code || code.length !== 2) return '🏳️'
   return code.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+}
+
+function getCountryName(code?: string | null | undefined) {
+  if (!code) return undefined
+  return collectedCountries.value[code]?.name
 }
 
 // Slideshow functions removed — gallery modal no longer used
@@ -128,8 +127,7 @@ const collectedCountriesList = computed(() => {
 
 
 const selectedCountry = ref<string | null>(null)
-const openCountry = (code: string) => { selectedCountry.value = code }
-const closeCountry = () => { selectedCountry.value = null }
+const openCountry = (code?: string | null) => { selectedCountry.value = code ?? null; countriesModalOpen.value = true }
 
 // Modal control to open the countries list (from the stat)
 const countriesModalOpen = ref(false)
@@ -141,7 +139,8 @@ const countryStamps = computed(() => {
   return stampEntries.value.filter(s => s.countryCode === selectedCountry.value)
 })
 
-const onDelete = async (id: string, name?: string, photoUrl?: string, countryCode?: string) => {
+const onDelete = async (id?: string) => {
+  if (!id) return
   const ok = confirm('Foto löschen? Diese Aktion kann nicht rückgängig gemacht werden.')
   if (!ok) return
   try {
@@ -272,9 +271,9 @@ const countriesCount = computed(() => Object.keys(collectedCountries.value).leng
       <section class="my-photos" aria-label="Meine Fotos">
         <div v-if="userPhotos.length" class="my-photos-grid">
           <button v-for="p in userPhotos" :key="p.id" class="my-photo-grid-item" type="button" @click="openCountry(p.countryCode)">
-            <img :src="p.photoUrl || p.url" :alt="p.name" />
-            <div class="flag" :title="(collectedCountries[p.countryCode]?.name) || p.countryCode">{{ countryCodeToEmoji(p.countryCode) }}</div>
-            <button class="delete-btn" @click.stop="onDelete(p.id, p.name, p.photoUrl, p.countryCode)" aria-label="Foto löschen">✕</button>
+            <img :src="p.photoUrl ?? ''" :alt="p.name" />
+            <div class="flag" :title="getCountryName(p.countryCode) || p.countryCode || 'Unbekannt'">{{ countryCodeToEmoji(p.countryCode) }}</div>
+            <button class="delete-btn" @click.stop="onDelete(p.id)" aria-label="Foto löschen">✕</button>
           </button>
         </div>
         <div v-else class="empty-state">Noch keine Fotos — mach eins in der Kamera.</div>

@@ -1,8 +1,8 @@
 export type GeocodeResult = {
   country: string | null
   countryCode: string | null
-  region?: string | null
-  city?: string | null
+  region: string | null
+  city: string | null
   geoResolved: boolean
 }
 
