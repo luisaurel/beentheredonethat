@@ -3,7 +3,6 @@
     <div class="login-page">
       <h1 class="login-title">BeenThereDoneThat</h1>
 
-      <!-- Login "Modal" im Stil vom Profil-Bearbeiten -->
       <div class="login-card" role="dialog" aria-modal="true">
         <h2 class="login-card-title">
           {{ isLogin ? 'Anmelden' : 'Registrieren' }}
@@ -18,6 +17,7 @@
             required
             autocomplete="email"
           />
+
           <input
             v-model="password"
             type="password"
@@ -27,14 +27,55 @@
             autocomplete="current-password"
           />
 
+          <!-- Registrierung -->
+          <div v-if="!isLogin" class="signup-extra">
+            <input
+              v-model="name"
+              type="text"
+              placeholder="Name"
+              class="login-input"
+              required
+              autocomplete="name"
+            />
+
+            <textarea
+              v-model="bio"
+              placeholder="Beschreibung"
+              class="login-input"
+              rows="3"
+            />
+
+            <div class="signup-avatar">
+  <div class="avatar-preview-circle">
+    <img
+      v-if="avatarDataUrl"
+      :src="avatarDataUrl"
+      alt="Profilbild Vorschau"
+    />
+  </div>
+
+  <label class="avatar-pick-btn">
+    Profilbild auswählen
+    <input type="file" accept="image/*" @change="onPickAvatar" />
+  </label>
+</div>
+
+          </div>
+
           <button type="submit" class="login-submit">
             {{ isLogin ? 'Einloggen' : 'Account erstellen' }}
           </button>
         </form>
 
         <div class="login-toggle-wrapper">
-          <button @click="isLogin = !isLogin" class="login-toggle" type="button">
-            {{ isLogin ? 'Noch kein Account? Hier registrieren' : 'Bereits einen Account? Hier einloggen' }}
+          <button
+            @click="toggleMode"
+            class="login-toggle"
+            type="button"
+          >
+            {{ isLogin
+              ? 'Noch kein Account? Hier registrieren'
+              : 'Bereits einen Account? Hier einloggen' }}
           </button>
         </div>
 
@@ -46,12 +87,16 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useAuth } from '../composables/useAuth.ts'
+import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
 
 const email = ref('')
 const password = ref('')
 const isLogin = ref(true)
+
+const name = ref('')
+const bio = ref('')
+const avatarDataUrl = ref('')
 
 const { login, signup, error } = useAuth()
 const router = useRouter()
@@ -60,17 +105,47 @@ const handleSubmit = async () => {
   if (isLogin.value) {
     await login(email.value, password.value)
   } else {
-    await signup(email.value, password.value)
+    await signup(email.value, password.value, {
+      name: name.value.trim(),
+      bio: bio.value,
+      avatarDataUrl: avatarDataUrl.value
+    })
   }
 
   if (!error.value) {
     router.push('/map')
   }
 }
+
+const toggleMode = () => {
+  isLogin.value = !isLogin.value
+  error.value = null
+
+  if (isLogin.value) {
+    name.value = ''
+    bio.value = ''
+    avatarDataUrl.value = ''
+  }
+}
+
+const onPickAvatar = (e) => {
+  const input = e.target
+  const file = input.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    const result = reader.result
+    if (typeof result === 'string') {
+      avatarDataUrl.value = result
+    }
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
 </script>
 
 <style scoped>
-/* ✅ HIER EINZIGE ÄNDERUNG: Hintergrundbild */
 .login-backdrop {
   position: fixed;
   inset: 0;
@@ -84,8 +159,6 @@ const handleSubmit = async () => {
   background-position: center;
   background-repeat: no-repeat;
 }
-
-/* alles darunter UNVERÄNDERT */
 
 .login-page {
   width: 100%;
@@ -188,4 +261,56 @@ const handleSubmit = async () => {
   color: #dc2626;
   font-weight: 600;
 }
+
+.signup-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signup-avatar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-preview-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #e5e5e5;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  display: grid;
+  place-items: center;
+}
+
+.avatar-preview-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-pick-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.avatar-pick-btn input {
+  display: none;
+}
+
+.signup-extra textarea {
+  resize: none;
+}
+
 </style>

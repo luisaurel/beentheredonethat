@@ -1,31 +1,51 @@
 import { ref } from 'vue'
-import { auth } from '../firebase/config'
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+import { auth, db } from '../firebase/config'
+import { doc, setDoc } from 'firebase/firestore'
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  type User
+  type User,
 } from 'firebase/auth'
 
-// Globaler State, damit alle Komponenten den gleichen User sehen
+type ProfileInput = {
+  name: string
+  bio: string
+  avatarDataUrl: string
+}
+
+// Globaler State
 const user = ref<User | null>(null)
 const error = ref<string | null>(null)
-const isReady = ref(false) // Firebase Auth ist initialisiert
+const isReady = ref(false)
 
-// Firebase Auth State Listener: aktualisiert user automatisch
 onAuthStateChanged(auth, (firebaseUser) => {
   user.value = firebaseUser
-  isReady.value = true // Firebase ist jetzt bereit
+  isReady.value = true
 })
 
 export function useAuth() {
-  
-  const signup = async (email: string, password: string) => {
+  const signup = async (
+    email: string,
+    password: string,
+    profile?: Partial<ProfileInput>
+  ) => {
     error.value = null
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password)
-      // user.value wird automatisch durch onAuthStateChanged aktualisiert
+
+      // Firestore-Profil anlegen/mergen
+      await setDoc(
+        doc(db, 'users', res.user.uid),
+        {
+          name: profile?.name ?? '',
+          bio: profile?.bio ?? '',
+          avatarDataUrl: profile?.avatarDataUrl ?? '',
+        },
+        { merge: true }
+      )
+
       return res
     } catch (err: any) {
       error.value = err.message
@@ -36,7 +56,6 @@ export function useAuth() {
     error.value = null
     try {
       const res = await signInWithEmailAndPassword(auth, email, password)
-      // user.value wird automatisch durch onAuthStateChanged aktualisiert
       return res
     } catch (err: any) {
       error.value = err.message
@@ -44,9 +63,9 @@ export function useAuth() {
   }
 
   const logout = async () => {
+    error.value = null
     try {
       await signOut(auth)
-      // user.value wird automatisch durch onAuthStateChanged auf null gesetzt
     } catch (err: any) {
       error.value = err.message
     }

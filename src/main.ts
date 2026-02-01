@@ -26,6 +26,23 @@ onAuthStateChanged(auth, (user) => {
         app.use(router)
         app.mount('#app')
     }
+
+    document.addEventListener(
+      'touchmove',
+      (e) => {
+        // Wenn 2+ Finger (Pinch)
+        if (e.touches.length > 1) {
+          const target = e.target as HTMLElement | null
+
+          // Wenn Touch innerhalb der Leaflet-Map ist -> NICHT blocken
+          if (target && target.closest('.leaflet-container')) return
+
+          // sonst blocken (verhindert Page-Zoom)
+          e.preventDefault()
+        }
+      },
+      { passive: false }
+    )
   
     // Test-Log 
     if (user) {
