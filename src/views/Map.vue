@@ -183,11 +183,6 @@ onUnmounted(() => {
         Lade Wahrzeichen...
       </div>
 
-      <!-- Camera Button oben rechts -->
-      <button class="camera-btn" @click="openCamera" title="Foto aufnehmen">
-        <img :src="cameraIcon" alt="Kamera" class="camera-btn-icon" />
-      </button>
-
       <div class="overlay-card">
         <div v-if="closestLandmark" class="card">
           <h2 class="card-title">{{ closestLandmark.name }}</h2>
@@ -340,7 +335,7 @@ onUnmounted(() => {
 }
 
 .card-button--active {
-  background-color: #22c55e;
+  background-color: black;
   color: white;
 }
 
