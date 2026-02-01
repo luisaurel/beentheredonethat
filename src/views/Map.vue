@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { useLocation } from '../composables/useLocation'
 import { useLandmarks } from '../composables/useLandmarks'
 import { useStamps } from '../composables/useStamps'
+import cameraIcon from '../assets/camera.png'
 
 const router = useRouter()
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
@@ -42,6 +43,11 @@ const collectStamp = () => {
   if (!canCollect.value || !closestLandmark.value) return
   saveMessage.value = null
   router.push({ name: 'Camera', query: { landmark: closestLandmark.value.name } })
+}
+
+const openCamera = () => {
+  // Open camera without a specific landmark - for free photo at current location
+  router.push({ name: 'Camera' })
 }
 
 const addLandmarkMarkers = () => {
@@ -124,6 +130,11 @@ onMounted(async () => {
     <div class="map-container">
       <div id="map"></div>
 
+      <!-- Camera Button oben rechts -->
+      <button class="camera-btn" @click="openCamera" title="Foto aufnehmen">
+        <img :src="cameraIcon" alt="Kamera" class="camera-btn-icon" />
+      </button>
+
       <div class="overlay-card">
         <div v-if="closestLandmark" class="card">
           <h2 class="card-title">{{ closestLandmark.name }}</h2>
@@ -166,6 +177,39 @@ onMounted(async () => {
   width: 100%;
   position: relative;
   overflow: hidden;
+}
+
+.camera-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.camera-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.camera-btn:active {
+  transform: scale(0.95);
+}
+
+.camera-btn-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
 #map {
