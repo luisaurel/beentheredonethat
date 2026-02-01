@@ -148,16 +148,27 @@ const onPickAvatar = (e) => {
 <style scoped>
 .login-backdrop {
   position: fixed;
-  inset: 0;
+  /* Stellt sicher, dass es wirklich den kompletten Screen füllt */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  
   display: grid;
   place-items: center;
-  padding: 16px;
-  box-sizing: border-box;
-
+  
+  /* Das Bild muss den gesamten Container überlagern */
   background-image: url('../assets/login_pic.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  
+  /* Falls noch Weiß durchblitzt, setzen wir eine Hintergrundfarbe */
+  background-color: #000; 
+  
+  /* Padding nur für den Inhalt, nicht für das Hintergrundbild */
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
+  box-sizing: border-box;
 }
 
 .login-page {

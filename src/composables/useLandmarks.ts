@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { useOverpass, type OverpassLandmark, type BoundingBox } from './useOverpass'
+import { useOverpass, type BoundingBox } from './useOverpass'
 
 // Landmark-Typ Definition (erweitert für beide Quellen)
 export interface Landmark {
