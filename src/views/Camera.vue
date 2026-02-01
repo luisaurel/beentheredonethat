@@ -1,13 +1,13 @@
 <template>
   <div class="camera-page">
-    <div v-if="!landmarkName" class="camera-message">
-      <p>Kein Wahrzeichen ausgewählt.</p>
-      <button class="btn-close" @click="close">Schließen</button>
-    </div>
-
+    <template v-if="isFreePhoto">
+      <h1 class="camera-title">Foto aufnehmen</h1>
+      <p class="camera-subtitle">Nimm ein Foto an diesem Ort auf – es wird als eigene Briefmarke gespeichert.</p>
+    </template>
     <template v-else>
       <h1 class="camera-title">Foto von {{ landmarkName }}</h1>
       <p class="camera-subtitle">Mache ein Foto des Wahrzeichens für deine Briefmarke.</p>
+    </template>
 
       <div class="camera-area">
         <video v-show="stream" ref="videoRef" class="camera-video" autoplay playsinline muted></video>
@@ -34,7 +34,6 @@
       </div>
 
       <button class="btn-close-secondary" @click="close">Abbrechen</button>
-    </template>
   </div>
 </template>
 
@@ -50,6 +49,15 @@ const { user } = useAuth()
 const { addStamp } = useStamps()
 
 const landmarkName = computed(() => (route.query.landmark as string) ?? '')
+const isFreePhoto = computed(() => !landmarkName.value)
+
+// Generate unique stamp name for free photos
+const generateFreePhotoName = () => {
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return `Foto ${dateStr} ${timeStr}`
+}
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const stream = ref<MediaStream | null>(null)
@@ -60,8 +68,6 @@ const isSaving = ref(false)
 const facingMode = ref<'environment' | 'user'>('environment')
 
 onMounted(async () => {
-  if (!landmarkName.value) return
-  
   // Prüfe ob mediaDevices verfügbar ist (wichtig für PWA)
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     cameraError.value = 'Kamera wird auf diesem Gerät nicht unterstützt'
@@ -198,12 +204,13 @@ async function switchCamera() {
 }
 
 async function saveAndClose() {
-  if (!capturedBlob.value || !landmarkName.value || !user.value) return
+  if (!capturedBlob.value || !user.value) return
   isSaving.value = true
   try {
     // Bild als Base64 konvertieren und direkt in Firestore speichern
     const base64Image = await blobToBase64(capturedBlob.value)
-    await addStamp(landmarkName.value, base64Image)
+    const stampName = isFreePhoto.value ? generateFreePhotoName() : landmarkName.value
+    await addStamp(stampName, base64Image)
     router.replace('/map')
   } catch (e) {
     console.error(e)

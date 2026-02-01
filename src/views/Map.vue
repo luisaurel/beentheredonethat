@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import AppShell from '../AppShell.vue'
-import { onMounted, computed, ref, watch, nextTick } from 'vue'
+import { onMounted, onUnmounted, computed, ref, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useRouter } from 'vue-router'
 import { useLocation } from '../composables/useLocation'
 import { useLandmarks } from '../composables/useLandmarks'
 import { useStamps } from '../composables/useStamps'
+import cameraIcon from '../assets/camera.png'
 
 const router = useRouter()
 const { coords, getBrowserLocation, calculateDistance } = useLocation()
-const { landmarks, loadLandmarks } = useLandmarks()
+const { landmarks, loadLandmarks, loadLandmarksForBounds, loading: landmarksLoading } = useLandmarks()
 const { stamps, loadStamps } = useStamps()
 
 const saveMessage = ref<string | null>(null)
 let map: L.Map | null = null
 let landmarkMarkers: L.Layer[] = []
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const landmarksWithDistance = computed(() => {
   if (!coords.value.lat || !coords.value.lng || landmarks.value.length === 0) return []
@@ -44,6 +46,30 @@ const collectStamp = () => {
   router.push({ name: 'Camera', query: { landmark: closestLandmark.value.name } })
 }
 
+const openCamera = () => {
+  // Open camera without a specific landmark - for free photo at current location
+  router.push({ name: 'Camera' })
+}
+
+// Lädt Overpass-Landmarks für aktuellen Kartenausschnitt
+const loadOverpassLandmarks = async () => {
+  if (!map) return
+  
+  const bounds = map.getBounds()
+  await loadLandmarksForBounds({
+    south: bounds.getSouth(),
+    west: bounds.getWest(),
+    north: bounds.getNorth(),
+    east: bounds.getEast()
+  })
+}
+
+// Debounced Version für Map-Events
+const debouncedLoadOverpass = () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(loadOverpassLandmarks, 500)
+}
+
 const addLandmarkMarkers = () => {
   if (!map) return
 
@@ -55,7 +81,14 @@ const addLandmarkMarkers = () => {
 
     const { lat, lng } = landmark.location
     const collected = stamps.value.includes(landmark.name)
-    const color = collected ? '#22c55e' : '#f97316'
+    
+    // Unterschiedliche Farben: Orange = nicht besucht, Grün = besucht, Blau = Overpass
+    let color = '#f97316' // Orange für Firebase
+    if (collected) {
+      color = '#22c55e' // Grün wenn gesammelt
+    } else if (landmark.source === 'overpass') {
+      color = '#3b82f6' // Blau für Overpass-Landmarks
+    }
 
     const pinIcon = L.divIcon({
       className: 'custom-pin',
@@ -71,9 +104,14 @@ const addLandmarkMarkers = () => {
       popupAnchor: [0, -42]
     })
 
+    // Popup-Text anpassen für Overpass-Landmarks
+    const popupText = landmark.city && landmark.country
+      ? `<b>${landmark.name}</b><br>${landmark.city}, ${landmark.country}`
+      : `<b>${landmark.name}</b>`
+
     const marker = L.marker([lat, lng], { icon: pinIcon })
       .addTo(map!)
-      .bindPopup(`<b>${landmark.name}</b><br>${landmark.city}, ${landmark.country}`)
+      .bindPopup(popupText)
 
     landmarkMarkers.push(marker)
   })
@@ -99,6 +137,13 @@ const initMap = async () => {
   }).addTo(map).bindPopup('Du bist hier')
 
   addLandmarkMarkers()
+  
+  // Overpass-Landmarks für initialen Ausschnitt laden
+  await loadOverpassLandmarks()
+
+  // Event-Listener für Map-Bewegung
+  map.on('moveend', debouncedLoadOverpass)
+  map.on('zoomend', debouncedLoadOverpass)
 
   setTimeout(() => map?.invalidateSize(), 200)
 }
@@ -117,6 +162,14 @@ onMounted(async () => {
     await initMap()
   }
 })
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  if (map) {
+    map.off('moveend', debouncedLoadOverpass)
+    map.off('zoomend', debouncedLoadOverpass)
+  }
+})
 </script>
 
 <template>
@@ -124,11 +177,24 @@ onMounted(async () => {
     <div class="map-container">
       <div id="map"></div>
 
+      <!-- Loading Indicator -->
+      <div v-if="landmarksLoading" class="loading-indicator">
+        <span class="loading-spinner"></span>
+        Lade Wahrzeichen...
+      </div>
+
+      <!-- Camera Button oben rechts -->
+      <button class="camera-btn" @click="openCamera" title="Foto aufnehmen">
+        <img :src="cameraIcon" alt="Kamera" class="camera-btn-icon" />
+      </button>
+
       <div class="overlay-card">
         <div v-if="closestLandmark" class="card">
           <h2 class="card-title">{{ closestLandmark.name }}</h2>
           <p class="card-subtitle">
-            {{ closestLandmark.city }}, {{ closestLandmark.country }} ·
+            <template v-if="closestLandmark.city && closestLandmark.country">
+              {{ closestLandmark.city }}, {{ closestLandmark.country }} ·
+            </template>
             {{ closestLandmark.distance.toFixed(0) }} m entfernt
           </p>
 
@@ -166,6 +232,68 @@ onMounted(async () => {
   width: 100%;
   position: relative;
   overflow: hidden;
+}
+
+.loading-indicator {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.camera-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.camera-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.camera-btn:active {
+  transform: scale(0.95);
+}
+
+.camera-btn-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
 #map {
