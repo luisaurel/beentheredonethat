@@ -6,6 +6,7 @@ import Chronik from '../views/Chronik.vue'
 import Map from '../views/Map.vue'
 import Profil from '../views/Profil.vue'
 import Camera from '../views/Camera.vue'
+import MyStamps from "../views/MyStamps.vue";
 
 const routes = [
   { 
@@ -42,6 +43,14 @@ const routes = [
     component: Camera,
     meta: { requiresAuth: true }
   },
+  {
+  path: "/my-stamps",
+  name: "MyStamps",
+  component: MyStamps,
+  meta: { requiresAuth: true }
+  },
+
+
 ]
 
 const router = createRouter({
