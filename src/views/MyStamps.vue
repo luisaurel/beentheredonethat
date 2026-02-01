@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppShell from "../AppShell.vue";
+import StampsGrid from "../components/StampsGrid.vue";
 import { COUNTRIES } from "../data/countries";
 
 type Tier = "gold" | "silver" | "bronze";
@@ -34,6 +36,10 @@ const tierLabel = (tier: Tier) => {
 </script>
 
 <template>
+  <AppShell title="Meine Briefmarken">
+    <StampsGrid />
+  </AppShell>
+
   <div class="page">
     <h1>Meine Briefmarken</h1>
 
