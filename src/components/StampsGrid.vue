@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { COUNTRIES } from "../data/countries";
-import { STAMP_THRESHOLDS, getTier } from "../data/stampThresholds";
+import { COUNTRIES, type CountryCode } from "../data/countries";
 import { useCountryStamps } from "../composables/useCountryStamps";
+import { STAMP_LIMITS, getTierStarted, splitCounts } from "../data/stampThresholds";
 
 type Tier = "gold" | "silver" | "bronze";
 
@@ -13,29 +13,32 @@ onMounted(() => {
 });
 
 /**
- * ⚠️ Pfad anpassen, falls du noch "stamps/stamps" hast:
- * Variante A (ohne doppelt stamps):
- *   ../assets/stamps/${tier}/${code}.png
- * Variante B (mit doppelt stamps) – wenn es bei dir so liegt:
- *   ../assets/stamps/stamps/${tier}/${code}.png
+ * Pfad zu deinen Assets:
+ * src/assets/stamps/<tier>/<CODE>.png
+ * Beispiel: src/assets/stamps/bronze/DE.png
+ *
+ * Wenn dein Ordner anders heißt, passe NUR diese Funktion an.
  */
 const stampUrl = (tier: Tier, code: string) =>
-  new URL(`../assets/stamps/${tier}/${code}.png`, import.meta.url).href
+  new URL(`../assets/stamps/${tier}/${code}.png`, import.meta.url).href;
 
+const totalOf = (code: string) => (countryProgress.value?.[code as CountryCode] ?? 0);
 
-const countOf = (code: string) => countryProgress.value?.[code as any] ?? 0;
-
-const totalDiscoveries = computed(() => {
-  const p = countryProgress.value;
-  if (!p) return 0;
-  return Object.values(p).reduce((a, b) => a + b, 0);
-});
-
-const progressText = (tier: Tier, count: number) => {
-  if (tier === "bronze") return `${count}/${STAMP_THRESHOLDS.bronze}`;
-  if (tier === "silver") return `${count}/${STAMP_THRESHOLDS.silver}`;
-  return `${count}/${STAMP_THRESHOLDS.gold}`;
+const tierCountOf = (code: string, tier: Tier) => {
+  const total = totalOf(code);
+  const split = splitCounts(total);
+  return split[tier];
 };
+
+const tierLimit = (tier: Tier) => STAMP_LIMITS[tier];
+
+const isStarted = (code: string, tier: Tier) => {
+  const total = totalOf(code);
+  const started = getTierStarted(total);
+  return started[tier];
+};
+
+const countryUiName = (c: (typeof COUNTRIES)[number]) => (c as any).uiName ?? c.name;
 
 const tierLabel = (tier: Tier) => {
   if (tier === "gold") return "Gold";
@@ -43,57 +46,60 @@ const tierLabel = (tier: Tier) => {
   return "Bronze";
 };
 
-const isUnlocked = (tier: Tier, count: number) => {
-  const t = getTier(count);
-  if (tier === "bronze") return t.bronze;
-  if (tier === "silver") return t.silver;
-  return t.gold;
-};
+const discoveriesText = (total: number) =>
+  `${total} ${total === 1 ? "Sehenswürdigkeit" : "Sehenswürdigkeiten"} entdeckt`;
 
-defineExpose({ totalDiscoveries });
+/** Optional: Gesamtfortschritt (für Debug oder später) */
+const totalDiscoveries = computed(() => {
+  const p = countryProgress.value;
+  if (!p) return 0;
+  return Object.values(p).reduce((a, b) => a + b, 0);
+});
 </script>
 
 <template>
-  <div>
+  <div class="wrap">
     <p v-if="loading" class="hint">Lade Briefmarken...</p>
-    <p v-if="error" class="hint">{{ error }}</p>
+    <p v-else-if="error" class="hint">{{ error }}</p>
 
-    <div
-      class="country"
-      v-for="country in COUNTRIES"
-      :key="country.code"
-    >
-      <div class="countryHeader">
-        <h2>{{ country.uiName ?? country.name }}</h2>
-        <p class="sub">
-          {{ countOf(country.code) }}
-          {{ countOf(country.code) === 1 ? "Sehenswürdigkeit" : "Sehenswürdigkeiten" }}
-          entdeckt
-        </p>
-      </div>
-
-      <div class="stampsRow">
-        <div
-          class="stampCard"
-          v-for="tier in (['gold','silver','bronze'] as const)"
-          :key="tier"
-        >
-          <img
-            :src="stampUrl(tier, country.code)"
-            class="stamp"
-            :class="{ locked: !isUnlocked(tier, countOf(country.code)) }"
-            :alt="`${tierLabel(tier)} ${country.code}`"
-          />
-
-          <div class="label">{{ tierLabel(tier) }}</div>
-          <div class="progress">{{ progressText(tier, countOf(country.code)) }}</div>
+    <div v-else>
+      <section v-for="country in COUNTRIES" :key="country.code" class="country">
+        <div class="countryHeader">
+          <div class="title">{{ countryUiName(country) }}</div>
+          <div class="sub">{{ discoveriesText(totalOf(country.code)) }}</div>
         </div>
-      </div>
+
+        <div class="row">
+          <div
+            v-for="tier in (['gold','silver','bronze'] as const)"
+            :key="tier"
+            class="card"
+          >
+            <img
+              :src="stampUrl(tier, country.code)"
+              class="stamp"
+              :class="{ locked: !isStarted(country.code, tier) }"
+              :alt="`${tierLabel(tier)} ${country.code}`"
+            />
+
+            <div class="label">{{ tierLabel(tier) }}</div>
+            <div class="progress">
+              {{ tierCountOf(country.code, tier) }}/{{ tierLimit(tier) }}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .hint {
   text-align: center;
   opacity: 0.75;
@@ -101,26 +107,31 @@ defineExpose({ totalDiscoveries });
 }
 
 .country {
-  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.countryHeader h2 {
-  margin: 0;
+.countryHeader .title {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
 }
 
-.sub {
-  margin: 4px 0 12px;
+.countryHeader .sub {
+  margin-top: 4px;
+  font-size: 14px;
   opacity: 0.7;
 }
 
-.stampsRow {
+.row {
   display: flex;
-  gap: 16px;
+  gap: 18px;
   flex-wrap: wrap;
 }
 
-.stampCard {
-  width: 110px;
+.card {
+  width: 120px;
   text-align: center;
 }
 
@@ -138,11 +149,11 @@ defineExpose({ totalDiscoveries });
 
 .label {
   margin-top: 6px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .progress {
-  font-size: 0.9rem;
+  font-size: 14px;
   opacity: 0.75;
 }
 </style>

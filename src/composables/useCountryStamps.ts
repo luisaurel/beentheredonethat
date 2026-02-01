@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, increment } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAuth } from "./useAuth";
 import { COUNTRIES, type CountryCode } from "../data/countries";
@@ -50,20 +50,41 @@ export function useCountryStamps() {
   };
 
   // Das rufst du auf, wenn ein Foto gemacht wurde
-  const addDiscovery = async (countryCode: CountryCode, photoUrl?: string) => {
-    if (!user.value) return;
-    const userRef = doc(db, "users", user.value.uid);
+   const addDiscovery = async (countryCode: CountryCode, photoUrl?: string) => {
+  if (!user.value) return;
+  const userRef = doc(db, "users", user.value.uid);
 
-    // Lokal absichern (UI fühlt sich direkt an)
-    if (!countryProgress.value) countryProgress.value = emptyProgress();
-    countryProgress.value[countryCode] += 1;
+  // 1) Firestore: sicherstellen, dass das Dokument existiert
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) {
+    const init = emptyProgress();
+    await setDoc(userRef, { countryProgress: init, countryPhotos: {} }, { merge: true });
+    countryProgress.value = init;
+    countryPhotos.value = {};
+  }
 
-    // Firestore update
-    await updateDoc(userRef, {
-      [`countryProgress.${countryCode}`]: countryProgress.value[countryCode],
-      ...(photoUrl ? { [`countryPhotos.${countryCode}`]: arrayUnion(photoUrl) } : {})
-    });
+  // 2) Firestore: atomisch erhöhen + optional Foto anhängen
+  await updateDoc(userRef, {
+    [`countryProgress.${countryCode}`]: increment(1),
+    ...(photoUrl ? { [`countryPhotos.${countryCode}`]: arrayUnion(photoUrl) } : {}),
+  });
+
+  // 3) Lokal: UI sofort aktualisieren (ohne nochmal zu laden)
+  if (!countryProgress.value) countryProgress.value = emptyProgress();
+  countryProgress.value = {
+    ...countryProgress.value,
+    [countryCode]: (countryProgress.value[countryCode] ?? 0) + 1,
   };
+
+  if (photoUrl) {
+    const current = countryPhotos.value[countryCode] ?? [];
+    countryPhotos.value = {
+      ...countryPhotos.value,
+      [countryCode]: [...current, photoUrl],
+    };
+  }
+};
+
 
   return {
     loading,

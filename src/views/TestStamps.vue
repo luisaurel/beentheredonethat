@@ -28,11 +28,7 @@ onMounted(() => {
       <strong>{{ c.uiName ?? c.name }}</strong><br />
       Entdeckungen: {{ countryProgress?.[c.code] ?? 0 }}
 
-      <div style="margin-top: 4px">
-        <button @click="addDiscovery(c.code)">
-          +1 Discovery
-        </button>
-      </div>
+
     </div>
   </div>
 </template>
