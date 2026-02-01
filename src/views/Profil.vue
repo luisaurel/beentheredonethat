@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { db } from '../firebase/config'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 
-import pisa1 from '../assets/pisa1.jpg'
 import editIcon from '../assets/edit.png'
 import logoutIcon from '../assets/logout.png'
 
