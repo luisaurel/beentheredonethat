@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import AppShell from '../AppShell.vue'
 import { useRouter } from 'vue-router'
+import { db } from '../firebase/config'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 
 import pisa1 from '../assets/pisa1.jpg'
 import editIcon from '../assets/edit.png'
@@ -17,10 +19,8 @@ type Profile = {
   avatarDataUrl: string
 }
 
-const STORAGE_KEY = 'profile_v1'
-
 const router = useRouter()
-const { logout } = useAuth()
+const { user, isReady, logout } = useAuth()
 
 const doLogout = async () => {
   try {
@@ -30,11 +30,11 @@ const doLogout = async () => {
   }
 }
 
-// --- Profil (Edit + LocalStorage) ---
+// --- Profil (Edit) ---
 const profile = ref<Profile>({
-  name: 'Mia Maus',
-  bio: 'Travel-Lover 🌍❤️',
-  avatarDataUrl: pisa1
+  name: '',
+  bio: '',
+  avatarDataUrl: ''
 })
 
 const isEditing = ref(false)
@@ -53,17 +53,20 @@ const closeEdit = () => {
   isEditing.value = false
 }
 
-const saveEdit = () => {
-  profile.value = {
+const saveEdit = async () => {
+  const nextProfile: Profile = {
     name: formName.value.trim() || profile.value.name,
     bio: formBio.value,
     avatarDataUrl: formAvatarDataUrl.value || profile.value.avatarDataUrl
   }
 
+  profile.value = nextProfile
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile.value))
+    if (!user.value) throw new Error('Kein eingeloggter User')
+    await setDoc(doc(db, 'users', user.value.uid), nextProfile, { merge: true })
   } catch (e) {
-    console.error('Konnte Profil nicht speichern (localStorage evtl. voll?)', e)
+    console.error('Konnte Profil nicht in Firestore speichern', e)
   } finally {
     isEditing.value = false
   }
@@ -132,13 +135,25 @@ const prevImage = () => {
 }
 
 onMounted(async () => {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (raw) {
+  // warten bis Firebase Auth initialisiert ist
+  while (!isReady.value) {
+    await new Promise((r) => setTimeout(r, 20))
+  }
+
+  // Profil aus Firestore laden
+  if (user.value) {
     try {
-      const saved = JSON.parse(raw) as Profile
-      if (saved?.name && saved?.avatarDataUrl) profile.value = saved
-    } catch {
-      // ignore
+      const snap = await getDoc(doc(db, 'users', user.value.uid))
+      if (snap.exists()) {
+        const data = snap.data() as Partial<Profile>
+        profile.value = {
+          name: data.name ?? '',
+          bio: data.bio ?? '',
+          avatarDataUrl: data.avatarDataUrl ?? ''
+        }
+      }
+    } catch (e) {
+      console.error('Konnte Profil nicht aus Firestore laden', e)
     }
   }
 
@@ -172,7 +187,13 @@ const countriesCount = computed(() => {
     <div class="profile">
       <!-- Header -->
       <section class="top">
-        <img class="avatar" :src="profile.avatarDataUrl" alt="Profilbild" />
+        <div class="avatar">
+  <img
+    v-if="profile.avatarDataUrl"
+    :src="profile.avatarDataUrl"
+    alt="Profilbild"
+  />
+</div>
 
         <div class="meta">
           <div class="name-row">
@@ -211,7 +232,6 @@ const countriesCount = computed(() => {
           <span v-if="!tile.hasPhotos" class="tile-badge">📷</span>
         </button>
 
-        <!-- ✅ Empty State im gleichen Stil wie Chronik -->
         <div v-if="!galleryTiles.length" class="empty-state">
           Los geht’s ✨<br />
           Fotografiere ein paar Sehenswürdigkeiten.
@@ -305,6 +325,7 @@ const countriesCount = computed(() => {
 </template>
 
 <style scoped>
+/* DEIN CSS: unverändert */
 .logout-btn {
   border: none;
   background: transparent;
@@ -357,10 +378,20 @@ const countriesCount = computed(() => {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #e5e5e5;
-  background: #f3f3f3;
+  background: #e5e5e5;
+  border: 1px solid #d1d5db;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
 }
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 .meta {
   flex: 1;
@@ -464,7 +495,7 @@ const countriesCount = computed(() => {
   border-radius: 999px;
 }
 
-/* ✅ Empty State im Chronik-Stil */
+/* Empty State */
 .empty-state {
   grid-column: 1 / -1;
   text-align: center;
