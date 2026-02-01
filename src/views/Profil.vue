@@ -87,7 +87,7 @@ const onPickAvatar = (e: Event) => {
 const { stamps, stampPhotos, loadStamps } = useStamps()
 const { landmarks, loadLandmarks } = useLandmarks()
 
-const selectedLandmark = ref<{ name: string; city: string; country: string } | null>(null)
+const selectedLandmark = ref<{ name: string; city?: string; country?: string } | null>(null)
 const currentImageIndex = ref(0)
 
 const collectedLandmarks = computed(() => {
@@ -113,7 +113,7 @@ const selectedPhotos = computed(() => {
   return getStampPhotos(selectedLandmark.value.name)
 })
 
-const openGallery = (landmark: { name: string; city: string; country: string }) => {
+const openGallery = (landmark: { name: string; city?: string; country?: string }) => {
   selectedLandmark.value = landmark
   currentImageIndex.value = 0
 }
@@ -150,7 +150,9 @@ const sightsCount = computed(() => collectedLandmarks.value.length)
 
 const countriesCount = computed(() => {
   const set = new Set<string>()
-  collectedLandmarks.value.forEach(l => set.add(l.country))
+  collectedLandmarks.value.forEach(l => {
+    if (l.country) set.add(l.country)
+  })
   return set.size
 })
 </script>
@@ -259,7 +261,7 @@ const countriesCount = computed(() => {
           <button class="gallery-close" @click="closeGallery" type="button">✕</button>
 
           <h2 class="gallery-title">{{ selectedLandmark.name }}</h2>
-          <p class="gallery-subtitle">{{ selectedLandmark.city }}, {{ selectedLandmark.country }}</p>
+          <p v-if="selectedLandmark.city || selectedLandmark.country" class="gallery-subtitle">{{ [selectedLandmark.city, selectedLandmark.country].filter(Boolean).join(', ') }}</p>
 
           <div v-if="selectedPhotos.length" class="gallery-content">
             <button
