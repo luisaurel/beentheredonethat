@@ -1,28 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import { COUNTRIES, type CountryCode } from "../data/countries";
 import { useCountryStamps } from "../composables/useCountryStamps";
 import { STAMP_LIMITS, getTierStarted, splitCounts } from "../data/stampThresholds";
 
-type Tier = "gold" | "silver" | "bronze";
+type Tier = "bronze" | "silver" | "gold";
 
-const { countryProgress, loading, error, loadCountryData } = useCountryStamps();
+const { countryProgress } = useCountryStamps();
 
-onMounted(() => {
-  loadCountryData();
-});
-
-/**
- * Pfad zu deinen Assets:
- * src/assets/stamps/<tier>/<CODE>.png
- * Beispiel: src/assets/stamps/bronze/DE.png
- *
- * Wenn dein Ordner anders heißt, passe NUR diese Funktion an.
- */
 const stampUrl = (tier: Tier, code: string) =>
   new URL(`../assets/stamps/${tier}/${code}.png`, import.meta.url).href;
 
-const totalOf = (code: string) => (countryProgress.value?.[code as CountryCode] ?? 0);
+const totalOf = (code: string) => countryProgress.value?.[code as CountryCode] ?? 0;
 
 const tierCountOf = (code: string, tier: Tier) => {
   const total = totalOf(code);
@@ -38,6 +27,11 @@ const isStarted = (code: string, tier: Tier) => {
   return started[tier];
 };
 
+const isComplete = (code: string, tier: Tier) =>
+  tierCountOf(code, tier) >= tierLimit(tier);
+
+const isFaded = (code: string, tier: Tier) => isStarted(code, tier) && !isComplete(code, tier);
+
 const countryUiName = (c: (typeof COUNTRIES)[number]) => (c as any).uiName ?? c.name;
 
 const tierLabel = (tier: Tier) => {
@@ -49,36 +43,27 @@ const tierLabel = (tier: Tier) => {
 const discoveriesText = (total: number) =>
   `${total} ${total === 1 ? "Sehenswürdigkeit" : "Sehenswürdigkeiten"} entdeckt`;
 
-/** Optional: Gesamtfortschritt (für Debug oder später) */
-const totalDiscoveries = computed(() => {
-  const p = countryProgress.value;
-  if (!p) return 0;
-  return Object.values(p).reduce((a, b) => a + b, 0);
-});
+const visibleCountries = computed(() =>
+  COUNTRIES.filter((c) => totalOf(c.code) > 0)
+);
 </script>
 
 <template>
   <div class="wrap">
-    <p v-if="loading" class="hint">Lade Briefmarken...</p>
-    <p v-else-if="error" class="hint">{{ error }}</p>
+    <section v-for="country in visibleCountries" :key="country.code" class="country">
+      <div class="countryHeader">
+        <div class="title">{{ countryUiName(country) }}</div>
+        <div class="sub">{{ discoveriesText(totalOf(country.code)) }}</div>
+      </div>
 
-    <div v-else>
-      <section v-for="country in COUNTRIES" :key="country.code" class="country">
-        <div class="countryHeader">
-          <div class="title">{{ countryUiName(country) }}</div>
-          <div class="sub">{{ discoveriesText(totalOf(country.code)) }}</div>
-        </div>
-
-        <div class="row">
-          <div
-            v-for="tier in (['gold','silver','bronze'] as const)"
-            :key="tier"
-            class="card"
-          >
+      <div class="row">
+        <!-- Reihenfolge: Bronze -> Silber -> Gold -->
+        <template v-for="tier in (['bronze', 'silver', 'gold'] as const)" :key="tier">
+          <div v-if="isStarted(country.code, tier)" class="card">
             <img
               :src="stampUrl(tier, country.code)"
               class="stamp"
-              :class="{ locked: !isStarted(country.code, tier) }"
+              :class="{ faded: isFaded(country.code, tier) }"
               :alt="`${tierLabel(tier)} ${country.code}`"
             />
 
@@ -87,9 +72,13 @@ const totalDiscoveries = computed(() => {
               {{ tierCountOf(country.code, tier) }}/{{ tierLimit(tier) }}
             </div>
           </div>
-        </div>
-      </section>
-    </div>
+        </template>
+      </div>
+    </section>
+
+    <p v-if="visibleCountries.length === 0" class="hint">
+      Noch keine Briefmarken – sammle deine ersten Sehenswürdigkeiten ✨
+    </p>
   </div>
 </template>
 
@@ -139,11 +128,10 @@ const totalDiscoveries = computed(() => {
   width: 72px;
   height: 72px;
   object-fit: contain;
-  transition: filter 0.2s ease, opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
-.locked {
-  filter: grayscale(1);
+.faded {
   opacity: 0.35;
 }
 

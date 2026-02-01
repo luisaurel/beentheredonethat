@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import editIcon from '../assets/edit.png'
 import logoutIcon from '../assets/logout.png'
 
+
 import { useStamps } from '../composables/useStamps'
 import { useLandmarks } from '../composables/useLandmarks'
 import { useAuth } from '../composables/useAuth'
@@ -28,6 +29,7 @@ const doLogout = async () => {
     router.push({ name: 'Login', query: { forceLogin: '1' } })
   }
 }
+
 
 // --- Profil (Edit) ---
 const profile = ref<Profile>({
@@ -89,8 +91,6 @@ const onPickAvatar = (e: Event) => {
 const { stamps, stampPhotos, loadStamps } = useStamps()
 const { landmarks, loadLandmarks } = useLandmarks()
 
-const selectedLandmark = ref<{ name: string; city?: string; country?: string } | null>(null)
-const currentImageIndex = ref(0)
 
 const collectedLandmarks = computed(() => {
   if (!stamps.value.length || !landmarks.value.length) return []
@@ -110,28 +110,9 @@ const galleryTiles = computed(() => {
   }))
 })
 
-const selectedPhotos = computed(() => {
-  if (!selectedLandmark.value) return []
-  return getStampPhotos(selectedLandmark.value.name)
-})
 
-const openGallery = (landmark: { name: string; city?: string; country?: string }) => {
-  selectedLandmark.value = landmark
-  currentImageIndex.value = 0
-}
 
-const closeGallery = () => {
-  selectedLandmark.value = null
-  currentImageIndex.value = 0
-}
 
-const nextImage = () => {
-  if (currentImageIndex.value < selectedPhotos.value.length - 1) currentImageIndex.value++
-}
-
-const prevImage = () => {
-  if (currentImageIndex.value > 0) currentImageIndex.value--
-}
 
 onMounted(async () => {
   // warten bis Firebase Auth initialisiert ist
@@ -163,12 +144,20 @@ onMounted(async () => {
 const sightsCount = computed(() => collectedLandmarks.value.length)
 
 const countriesCount = computed(() => {
-  const set = new Set<string>()
-  collectedLandmarks.value.forEach(l => {
-    if (l.country) set.add(l.country)
+  if (!stamps.value.length || !landmarks.value.length) return 0
+
+  const countries = new Set<string>()
+
+  stamps.value.forEach(stampName => {
+    const landmark = landmarks.value.find(l => l.name === stampName)
+    if (landmark?.country) {
+      countries.add(landmark.country)
+    }
   })
-  return set.size
+
+  return countries.size
 })
+
 </script>
 
 <template>
@@ -195,7 +184,6 @@ const countriesCount = computed(() => {
     alt="Profilbild"
   />
 </div>
-
         <div class="meta">
           <div class="name-row">
             <div class="name">{{ profile.name }}</div>
@@ -222,22 +210,24 @@ const countriesCount = computed(() => {
 
       <!-- Galerie -->
       <section class="gallery" aria-label="Gesammelte Sehenswürdigkeiten">
-        <button
-          v-for="tile in galleryTiles"
+        <div
+          v-for="(tile, idx) in galleryTiles"
           :key="tile.name"
           class="tile"
-          type="button"
-          @click="openGallery(tile)"
         >
           <img :src="tile.thumb" :alt="tile.name" />
           <span v-if="!tile.hasPhotos" class="tile-badge">📷</span>
-        </button>
+
 
         <div v-if="!galleryTiles.length" class="empty-state">
           Los geht’s ✨<br />
           Fotografiere ein paar Sehenswürdigkeiten.
         </div>
+        </div>
       </section>
+</div>
+
+
 
       <!-- Edit Modal -->
       <div v-if="isEditing" class="modal-backdrop" @click.self="closeEdit">
@@ -273,55 +263,6 @@ const countriesCount = computed(() => {
           </div>
         </div>
       </div>
-
-      <!-- Gallery Modal -->
-      <div v-if="selectedLandmark" class="gallery-overlay" @click.self="closeGallery">
-        <div class="gallery-modal">
-          <button class="gallery-close" @click="closeGallery" type="button">✕</button>
-
-          <h2 class="gallery-title">{{ selectedLandmark.name }}</h2>
-          <p v-if="selectedLandmark.city || selectedLandmark.country" class="gallery-subtitle">{{ [selectedLandmark.city, selectedLandmark.country].filter(Boolean).join(', ') }}</p>
-
-          <div v-if="selectedPhotos.length" class="gallery-content">
-            <button
-              v-if="selectedPhotos.length > 1"
-              class="gallery-nav"
-              :disabled="currentImageIndex === 0"
-              @click="prevImage"
-              type="button"
-            >
-              ‹
-            </button>
-
-            <div class="gallery-image-wrap">
-              <img
-                :src="selectedPhotos[currentImageIndex]"
-                :alt="selectedLandmark.name"
-                class="gallery-image"
-              />
-            </div>
-
-            <button
-              v-if="selectedPhotos.length > 1"
-              class="gallery-nav"
-              :disabled="currentImageIndex === selectedPhotos.length - 1"
-              @click="nextImage"
-              type="button"
-            >
-              ›
-            </button>
-          </div>
-
-          <div v-else class="gallery-empty">
-            Noch keine Fotos für diesen Stempel.
-          </div>
-
-          <p v-if="selectedPhotos.length > 1" class="gallery-counter">
-            {{ currentImageIndex + 1 }} / {{ selectedPhotos.length }}
-          </p>
-        </div>
-      </div>
-    </div>
   </AppShell>
 </template>
 
@@ -468,7 +409,6 @@ const countriesCount = computed(() => {
   background: transparent;
   border-radius: 10px;
   overflow: hidden;
-  cursor: pointer;
 }
 
 .tile::before {
@@ -616,107 +556,4 @@ const countriesCount = computed(() => {
   color: #fff;
 }
 
-/* Gallery Modal */
-.gallery-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.gallery-modal {
-  background: #1e293b;
-  border-radius: 16px;
-  max-width: 420px;
-  width: 100%;
-  padding: 20px;
-  position: relative;
-}
-
-.gallery-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.gallery-title {
-  color: #f9fafb;
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px;
-  padding-right: 40px;
-}
-
-.gallery-subtitle {
-  color: #94a3b8;
-  font-size: 13px;
-  margin: 0 0 16px;
-}
-
-.gallery-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.gallery-image-wrap {
-  flex: 1;
-  aspect-ratio: 4/3;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #0f172a;
-}
-
-.gallery-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.gallery-nav {
-  background: rgba(255, 255, 255, 0.12);
-  border: none;
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  font-size: 24px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.gallery-nav:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.gallery-counter {
-  text-align: center;
-  color: #94a3b8;
-  font-size: 13px;
-  margin: 12px 0 0;
-}
-
-.gallery-empty {
-  color: #cbd5e1;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
-}
 </style>
