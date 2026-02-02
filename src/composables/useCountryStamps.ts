@@ -52,6 +52,7 @@ export function useCountryStamps() {
   // Das rufst du auf, wenn ein Foto gemacht wurde
    const addDiscovery = async (countryCode: CountryCode, photoUrl?: string) => {
   if (!user.value) return;
+  const code = (countryCode ?? '').toString().toUpperCase() as CountryCode;
   const userRef = doc(db, "users", user.value.uid);
 
   // 1) Firestore: sicherstellen, dass das Dokument existiert
@@ -65,22 +66,22 @@ export function useCountryStamps() {
 
   // 2) Firestore: atomisch erhöhen + optional Foto anhängen
   await updateDoc(userRef, {
-    [`countryProgress.${countryCode}`]: increment(1),
-    ...(photoUrl ? { [`countryPhotos.${countryCode}`]: arrayUnion(photoUrl) } : {}),
+    [`countryProgress.${code}`]: increment(1),
+    ...(photoUrl ? { [`countryPhotos.${code}`]: arrayUnion(photoUrl) } : {}),
   });
 
   // 3) Lokal: UI sofort aktualisieren (ohne nochmal zu laden)
   if (!countryProgress.value) countryProgress.value = emptyProgress();
   countryProgress.value = {
     ...countryProgress.value,
-    [countryCode]: (countryProgress.value[countryCode] ?? 0) + 1,
+    [code]: (countryProgress.value[code] ?? 0) + 1,
   };
 
   if (photoUrl) {
-    const current = countryPhotos.value[countryCode] ?? [];
+    const current = countryPhotos.value[code] ?? [];
     countryPhotos.value = {
       ...countryPhotos.value,
-      [countryCode]: [...current, photoUrl],
+      [code]: [...current, photoUrl],
     };
   }
 };

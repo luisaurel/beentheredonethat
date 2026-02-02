@@ -152,7 +152,7 @@ onMounted(async () => {
     await initMap()
   } catch (err) {
     console.error('Konnte Standort nicht laden', err)
-    coords.value = { lat: 52.52, lng: 13.405 }
+    coords.value = { lat: 52.52, lng: 13.405, accuracy: 0 }
     await Promise.all([loadStamps(), loadLandmarks()])
     await initMap()
   }

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
 export function useLocation() {
-  const coords = ref({ lat: 0, lng: 0 })
+  const coords = ref({ lat: 0, lng: 0, accuracy: 0 })
   const locationError = ref<string | null>(null)
   let watchId: number | null = null
 
@@ -16,7 +16,8 @@ export function useLocation() {
       (position) => {
         coords.value = {
           lat: position.coords.latitude,
-          lng: position.coords.longitude
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? 0
         }
       },
       (err) => { locationError.value = err.message },
@@ -28,7 +29,7 @@ export function useLocation() {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId)
   }
 
-  const getBrowserLocation = (): Promise<{ lat: number; lng: number }> => {
+  const getBrowserLocation = (): Promise<{ lat: number; lng: number; accuracy?: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         locationError.value = 'Geolocation wird nicht unterstützt.'
@@ -39,9 +40,10 @@ export function useLocation() {
         (position) => {
           coords.value = {
             lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy ?? 0
           }
-          resolve(coords.value)
+          resolve({ lat: coords.value.lat, lng: coords.value.lng, accuracy: coords.value.accuracy })
         },
         (err) => {
           locationError.value = err.message

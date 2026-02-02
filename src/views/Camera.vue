@@ -44,6 +44,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useStamps } from '../composables/useStamps'
+import { useLocation } from '../composables/useLocation'
 
 const route = useRoute()
 const router = useRouter()
@@ -212,7 +213,18 @@ async function saveAndClose() {
     // Bild als Base64 konvertieren und direkt in Firestore speichern
     const base64Image = await blobToBase64(capturedBlob.value)
     const stampName = isFreePhoto.value ? generateFreePhotoName() : landmarkName.value
-    await addStamp(stampName, base64Image)
+
+    // Versuche aktuelle Browser-Location zu holen (inkl. accuracy)
+    let loc: { lat: number; lng: number; accuracy?: number } | undefined = undefined
+    try {
+      const { getBrowserLocation } = useLocation()
+      loc = await getBrowserLocation()
+    } catch {
+      // falls Geolocation fehlschlägt, speichern wir trotzdem
+      loc = undefined
+    }
+
+    await addStamp(stampName, base64Image, loc)
     router.replace('/map')
   } catch (e) {
     console.error(e)
