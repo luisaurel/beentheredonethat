@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
 import { computed } from "vue";
 import { COUNTRIES, type CountryCode } from "../data/countries";
 import { useCountryStamps } from "../composables/useCountryStamps";
@@ -44,12 +43,9 @@ const tierLabel = (tier: Tier) => {
 const discoveriesText = (total: number) =>
   `${total} ${total === 1 ? "Sehenswürdigkeit" : "Sehenswürdigkeiten"} entdeckt`;
 
-<<<<<<< HEAD
-=======
 const visibleCountries = computed(() =>
   COUNTRIES.filter((c) => totalOf(c.code) > 0)
 );
->>>>>>> 011c2eb5f9b3beb8672fe11ac3c6df6c38ccebc1
 </script>
 
 <template>

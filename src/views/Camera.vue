@@ -1,13 +1,15 @@
 <template>
   <div class="camera-page">
-    <template v-if="isFreePhoto">
-      <h1 class="camera-title">Foto aufnehmen</h1>
-      <p class="camera-subtitle">Nimm ein Foto an diesem Ort auf – es wird als eigene Briefmarke gespeichert.</p>
-    </template>
-    <template v-else>
-      <h1 class="camera-title">Foto von {{ landmarkName }}</h1>
-      <p class="camera-subtitle">Mache ein Foto des Wahrzeichens für deine Briefmarke.</p>
-    </template>
+    <div class="camera-header">
+      <template v-if="isFreePhoto">
+        <h1 class="camera-title">Foto aufnehmen</h1>
+        <p class="camera-subtitle">Nimm ein Foto an diesem Ort auf – es wird als eigene Briefmarke gespeichert.</p>
+      </template>
+      <template v-else>
+        <h1 class="camera-title">Foto von {{ landmarkName }}</h1>
+        <p class="camera-subtitle">Mache ein Foto des Wahrzeichens für deine Briefmarke.</p>
+      </template>
+    </div>
 
       <div class="camera-area">
         <video v-show="stream" ref="videoRef" class="camera-video" autoplay playsinline muted></video>
@@ -226,13 +228,14 @@ function close() {
 </script>
 
 <style scoped>
+
 .camera-page {
-  padding: 24px 16px 80px;
-  max-width: 420px;
+  padding: 16px 20px 80px;
+  max-width: 480px;
   margin: 0 auto;
   height: 100vh;
-  background: #0f172a;
-  color: #f8fafc;
+  background: #ffffff;
+  color: #1e293b;
   overflow: hidden;
   position: fixed;
   top: 0;
@@ -240,34 +243,40 @@ function close() {
   right: 0;
   bottom: 0;
   touch-action: none;
-  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
 }
 
-.camera-message {
+.camera-header {
+  margin-bottom: 24px;
   text-align: center;
-  padding: 2rem 0;
 }
 
 .camera-title {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
-  margin: 0 0 4px;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+  color: #0f172a;
 }
 
 .camera-subtitle {
-  font-size: 14px;
-  color: #94a3b8;
-  margin: 0 0 16px;
+  font-size: 15px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .camera-area {
   position: relative;
   width: 100%;
-  aspect-ratio: 4/3;
-  background: #1e293b;
-  border-radius: 16px;
+  aspect-ratio: 4/5; /* Taller aspect ratio looks more modern */
+  background: #f1f5f9;
+  border-radius: 24px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
 }
 
 .camera-video,
@@ -283,89 +292,126 @@ function close() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .camera-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  margin-top: auto; /* Push to bottom */
+  padding-bottom: 20px;
 }
 
+/* Primary Action Button (Capture/Save) */
 .btn-capture,
 .btn-save {
   width: 100%;
-  padding: 14px;
-  border-radius: 12px;
+  padding: 16px;
+  border-radius: 16px;
   border: none;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 16px;
   cursor: pointer;
-  background: #22c55e;
+  background: #0f172a; /* Dark primary button for high contrast */
   color: white;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
 }
 
 .btn-capture:hover,
 .btn-save:hover:not(:disabled) {
-  background: #16a34a;
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.btn-capture:active,
+.btn-save:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-save:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  transform: none;
 }
 
+/* Secondary Action Button (Retake) */
 .btn-retake {
   width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  border: 2px solid #64748b;
-  background: transparent;
-  color: #94a3b8;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #475569;
   font-weight: 600;
+  font-size: 16px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
+.btn-retake:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+/* Close/Cancel Button */
 .btn-close,
 .btn-close-secondary {
-  margin-top: 16px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid #475569;
+  width: 100%;
+  padding: 12px;
+  border: none;
   background: transparent;
-  color: #94a3b8;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 15px;
   cursor: pointer;
-  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.btn-close-secondary:hover {
+  color: #334155;
 }
 
 .camera-error {
-  color: #f87171;
-  font-size: 13px;
+  color: #ef4444;
+  font-size: 14px;
   margin: 0;
+  text-align: center;
+  padding: 8px;
+  background: #fef2f2;
+  border-radius: 8px;
 }
 
 .btn-flip {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: none;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
   font-size: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, background 0.2s ease;
+  z-index: 10;
 }
 
 .btn-flip:hover {
-  background: rgba(0, 0, 0, 0.7);
-  transform: rotate(180deg);
+  background: #ffffff;
+  transform: scale(1.05) rotate(180deg);
 }
+
+.btn-flip:active {
+  transform: scale(0.95) rotate(180deg);
+}
+
 </style>

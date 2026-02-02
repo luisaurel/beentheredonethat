@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import AppShell from "../AppShell.vue";
 import StampsGrid from "../components/StampsGrid.vue";
 import { useCountryStamps } from "../composables/useCountryStamps";

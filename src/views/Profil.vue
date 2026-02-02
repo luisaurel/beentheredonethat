@@ -211,7 +211,7 @@ const countriesCount = computed(() => {
       <!-- Galerie -->
       <section class="gallery" aria-label="Gesammelte Sehenswürdigkeiten">
         <div
-          v-for="(tile, idx) in galleryTiles"
+          v-for="tile in galleryTiles"
           :key="tile.name"
           class="tile"
         >
