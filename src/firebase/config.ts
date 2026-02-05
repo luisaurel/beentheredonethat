@@ -2,11 +2,12 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 const firebaseConfig = {
-    apiKey: "AIzaSyBG4bFoerfM-rPZQ6_euZWKZrwnvtq1S4E",
-    authDomain: "beentheredonethat-b23fc.firebaseapp.com",
-    projectId: "beentheredonethat-b23fc",
-    messagingSenderId: "410346896563",
-    appId: "1:410346896563:web:28a4fd0f395290934004c6"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
   };
 
 const app = initializeApp(firebaseConfig);

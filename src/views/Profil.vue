@@ -266,8 +266,7 @@ const countriesCount = computed(() => Object.keys(collectedCountries.value).leng
           </template>
         </div>
       </div>
-        </div>
-      </div>
+
 
       <!-- Meine Fotos (3-Spalten-Grid mit Flagge) -->
       <section class="my-photos" aria-label="Meine Fotos">
